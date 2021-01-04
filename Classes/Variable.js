@@ -1,0 +1,127 @@
+
+class Variable {
+  constructor(name, data, colVals){
+
+    // make it possible to have data with gaps by allowing for each
+    // value to have its own y value (time position)
+
+    this.id = data.id;
+    this.rowID = data.rowID;
+    this.displayGroup = data.id+1;
+    this.name = name;
+    this._state = data ? data.state : true;
+    this.color = data.color;
+    this.mappings = [];
+    this.unit = data.unit;  // not used
+    this._colVals = colVals;
+    this.gain = data ? data.gain : 0.25;
+    this.values = [];
+    this.update(name, data);
+  }
+
+  update(name, data){
+
+    // empty old values
+    while(this.values.length){
+      this.values.pop();
+    }
+
+    this.name = name;
+    delete(this.min);
+    delete(this.max);
+    delete(this.minCol);
+    delete(this.maxCol);
+    let x = 0;
+
+    (data.values || []).forEach(valObj => {
+      let col, val;
+
+      if(typeof valObj == "object"){
+        col = valObj.col;
+        val = valObj.val;
+      }
+      if(typeof col == "undefined"){
+        col = this._colVals[x++];
+        val = valObj;
+      }
+      if(typeof this.min == "undefined"){this.min = val}
+      if(typeof this.max == "undefined"){this.max = val}
+      if(typeof this.minCol == "undefined"){this.minCol = col}
+      if(typeof this.maxCol == "undefined"){this.maxCol = col}
+      this.min = Math.min(this.min, val);
+      this.max = Math.max(this.max, val);
+      this.minCol = Math.min(this.minCol, col);
+      this.maxCol = Math.max(this.maxCol, col);
+      this.values.push({col: col, val: val});
+    });
+  }
+
+
+  relX2val(x){
+    let col = x * (this.maxCol - this.minCol) +  this.minCol;
+    let valObj = this.values.find(entry => entry.col == col);
+    if(valObj){
+      return valObj.val;
+    } else {
+      // interpolate between two values
+      let val1 = this.values.filter(entry => entry.col < col).pop();
+      let val2 = this.values.find(entry => entry.col > col);
+      if(typeof val1 == "undefined"){val1 = this.values[0].col}
+      if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
+
+      let relColDiff = (col-val1.col)/(val2.col-val1.col);
+      let valDiff = val2.val - val1.val;
+      return val1.val + valDiff * relColDiff;
+    }
+  }
+
+  unMute(){
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = this.gain;
+    }
+  }
+
+  mute(){
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = 0;
+    }
+  }
+
+  get state(){
+    return this._state;
+  }
+
+  set state(_state){
+    this._state = _state;
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = _state ? this.gain : 0;
+    }
+  }
+
+  get data(){
+    return {
+      name: this.name,
+      id: this.id,
+      rowID: this.rowID,
+      gain: this.gain,
+      state: this.state,
+      color: this.color,
+      audioObjectID: this.targetAudioObject ? this.targetAudioObject.id : 0
+    };
+  }
+
+  set gain(val){
+    this._gain = val;
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = val;
+    }
+  }
+
+  get gain(){
+    return this._gain;
+  }
+
+}
+
+
+module.exports = Variable;

@@ -1,0 +1,1726 @@
+(function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+class AudioParameterMapping {
+
+  constructor(varObj, paramObj, data = {}){
+    this.variable = varObj;
+    this.audioParameter = paramObj;
+    this.init(varObj, paramObj, data);
+  }
+
+  init(varObj, paramObj, data){
+    this.id = typeof data.id == "undefined" ? AudioParameterMapping.cnt++ : data.id;
+    this.state = typeof data.state == "undefined" ? true : data.state;
+    this.invert = typeof data.invert == "undefined" ? false : data.invert;
+
+    this.inputLow = typeof data.inputLow == "undefined" ? varObj.min : data.inputLow;
+    this.inputHigh = typeof data.inputHigh == "undefined" ? varObj.max : data.inputHigh;
+    this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
+    this.outputHigh = typeof data.outputHigh == "undefined" ? paramObj.max : data.outputHigh;
+
+
+  }
+
+  update(data){
+    if(!data){return}
+
+    Object.entries(data).forEach(entry => {
+
+      let key = entry[0];
+      let value = entry[1];
+
+      switch (key) {
+        case "variable":
+          // update mins and maxs
+          let range = this.variable.max - this.variable.min;
+          let relInputLow = (this.inputLow - this.variable.min) / range;
+          let relInputHigh= (this.inputHigh - this.variable.min) / range;
+          let newVarObj = value;
+          let newRange = newVarObj.max - newVarObj.min;
+          this.inputLow = relInputLow * newRange + newVarObj.min;
+          this.inputHigh = relInputHigh * newRange + newVarObj.max;
+          break;
+
+        default:
+
+      }
+      this[key] = value;
+    });
+
+    if(!this.state){
+      // reset all parameters when disabled
+      this.audioParameter.target.setValueAtTime(this.audioParameter.target.defaultValue, 0);
+    }
+  }
+
+
+
+  mapValue(x){
+    x = Math.max(this.inputLow, x);
+    x = Math.min(this.inputHigh, x);
+    let relInput = (x - this.inputLow)/(this.inputHigh - this.inputLow);
+    // invert if specified
+    relInput = this.invert ? 1 - relInput : relInput;
+    // do math for exp, bellcurve, etc
+    relInput = Math.pow(relInput, this.audioParameter.conv);
+
+    let output = relInput * (this.outputHigh - this.outputLow) + this.outputLow;
+
+    return output;
+  }
+
+  get state(){
+    return this._state;
+  }
+
+  set state(newState){
+    this._state = newState;
+  }
+
+  get data(){
+    return {
+      parameterID: this.audioParameter.id,
+      inputLow: this.inputLow,
+      inputHigh: this.inputHigh,
+      outputLow: this.outputLow,
+      outputHigh: this.outputHigh,
+      invert: this.invert,
+      state: this.state,
+      id: this.id
+    }
+  }
+
+  get inputLow(){
+    return this._inputLow;
+  }
+  set inputLow(val){
+    this._inputLow = parseFloat(val);
+  }
+  get inputHigh(){
+    return this._inputHigh;
+  }
+  set inputHigh(val){
+    this._inputHigh = parseFloat(val);
+  }
+  get outputLow(){
+    return this._outputLow;
+  }
+  set outputLow(val){
+    this._outputLow = parseFloat(val);
+  }
+  get outputHigh(){
+    return this._outputHigh;
+  }
+  set outputHigh(val){
+    this._outputHigh = parseFloat(val);
+  }
+  set invert(val){
+    this._invert = val;
+  }
+
+  get invert(){
+    return this._invert;
+  }
+}
+
+AudioParameterMapping.cnt = 0;
+
+module.exports = AudioParameterMapping;
+
+},{}],2:[function(require,module,exports){
+var Variable = require('./Variable.js');
+var FileManager = require('./FileManager.js');
+var AudioParameterMapping = require('./AudioParameterMapping.js');
+
+
+class DataManager {
+
+  constructor(src, waxml, gui){
+    this._variables = [];
+    this.audioConfig = waxml.structure;
+    this._waxml = waxml;
+    this.GUI = gui;
+    this.GUI.dataManager = this;
+    this._listeners = {};
+
+    this.muteAllAudioObjects();
+    this.audioConfig.audioObjects.forEach(audioObject => {
+      if(audioObject.level == 2){audioObject.target.gain = 0}
+    });
+
+    this.mappings = [];
+    this.animationIntervalTime = 10;
+
+    this.audioMaster = this._waxml.master;
+    this.audioMaster.gain = 0;
+    this.dir = 1;
+    this._variableID = 0;
+
+    this.fileManager = new FileManager();
+
+    if(src){
+      this._data = this.parseData(src);
+    }
+
+    this.duration = this.GUI.duration;
+  }
+
+
+  parseData(src){
+
+    fetch(src)
+      .then(response => response.text())
+      .then(csv => {
+        this._data = csv.split("\n").map(row => {
+          let delimiter = row.includes(";") ? ";" : ",";
+          return row.split(delimiter).map(cell => {
+            let floatVal = parseFloat(cell);
+            if(isNaN(floatVal)){return cell}
+          	return floatVal;
+          });
+        });
+        this._columnValues = this.firstRow.filter(entry => typeof entry == "number");
+        this.dispatchEvent(new CustomEvent("inited"));
+      });
+  }
+
+  set fileManager(fm){
+    this._fileManager = fm;
+  }
+
+  get fileManager(){
+    return this._fileManager;
+  }
+
+  get firstRow(){
+    return this.getRow(0);
+  }
+
+  get firstColumn(){
+    return this.getColumn(0);
+  }
+
+  get displayGroups(){
+    let groups = [];
+    let id = 1;
+    while (groups.length < this._variables.length) {
+      groups.push(id++);
+    }
+    return groups;
+  }
+
+  getRow(x){
+    return this._data[x];
+  }
+
+  getColumn(x){
+    let col = [];
+    this._data.forEach(row => {
+      col.push(row[x]);
+    });
+    return col;
+  }
+
+  getCell(x, y){
+    return this._data[x][y];
+  }
+
+  getAllData(format = "json"){
+    let data;
+    switch (format) {
+      case "json":
+        data = {};
+        data.version = 1;
+        data.duration = this.duration;
+        //data.table = this._data;
+        //data.audioConfig = {};
+        //data.audioConfig.xml = this.audioConfig.xml;
+        data.variableMappings = this.getMappingData();
+        return JSON.stringify(data);
+      break;
+
+      case "xml":
+
+      break;
+
+      default:
+
+    }
+  }
+
+  setAllData(json){
+
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch(e) {
+        console.warn(e);
+        return;
+    }
+
+    let OK = true;
+    if(this._variables.length){
+      OK = confirm("Do you want to replace your current configuration?");
+    }
+    if(OK){
+      while(this._variables.length){
+        let varObj = this._variables.pop();
+        varObj.mute();
+        this.removeVariable(varObj.id)
+      }
+      this.variableID = 0;
+      this.duration = data.duration || 60;
+      this.GUI.duration = this.duration;
+
+      let id = 0;
+      data.variableMappings.forEach(varData => {
+        let varObj = this.setVariable(varData.rowID, varData.name, varData.id, varData);
+        this.setTargetAudioObject(varData.id, varData.audioObjectID);
+
+        varData.mappings.forEach(mapping => {
+          let paramObj = this.getParameter(mapping.parameterID);
+          let mappingObj = this.setMapping(mapping.id, varObj, paramObj, mapping);
+          varObj.mappings.push(mappingObj);
+        });
+      });
+      this.GUI.initVariables(this._variables, {warnings: false});
+    }
+
+  }
+
+
+  getMappingData(){
+    let data = [];
+    this._variables.forEach(variable => {
+      let mappings = [];
+      this.mappings.filter(mapping => mapping.variable == variable).forEach(mapping => {
+        mappings.push(mapping.data);
+      });
+      if(mappings.length){
+        let varObj = variable.data;
+        varObj.mappings = mappings;
+        data.push(varObj);
+      }
+    });
+    return data;
+  }
+
+  get variableID(){
+    return this._variableID++;
+  }
+
+  set variableID(val){
+    this._variableID = val;
+  }
+
+  setVariable(id, varName, rowID, varData){
+    let values = this.getVariableData(parseFloat(rowID));
+    let varObj = this._variables.find(entry => entry.id == id);
+    if(varObj){
+      varObj.update(varName, {values: values});
+
+      this.mappings.forEach(mapping => {
+        mapping.update({variable: varObj});
+      });
+
+    } else {
+      if(varData){
+        varData.values = values;
+      } else {
+        varData = {
+          values: values,
+          id: id,
+          rowID: rowID,
+          color: this.GUI.color
+        }
+      }
+      varObj = new Variable(varName, varData, this._columnValues);
+      this._variables.push(varObj);
+    }
+
+    return varObj;
+  }
+
+  setGain(id, vol, updateGUI = true){
+    let varObj = this._variables.find(entry => entry.id == id);
+    varObj.gain = vol;
+    if(updateGUI){this.GUI.setGain(id, vol)}
+  }
+
+  getVariable(id){
+    return this._variables.find(varObj => varObj.id == id);
+  }
+
+  setVariableState(id, state, updateGUI = true){
+    this.getVariable(id).state = state;
+    if(updateGUI){this.GUI.setVariableState(id, state)}
+  }
+
+  getVariableData(id){
+    return this.getRow(id+1).filter(val => typeof val == "number");
+    return this._data.find(row => row[0] == varName).filter(val => typeof val == "number");
+  }
+
+  get activeVariables(){
+    return this._variables.filter(varObj => varObj.state == true);
+  }
+
+  getParameter(id){
+    return this.audioConfig.parameters.find(param => param.id == id);
+  }
+
+  getAudioObject(id){
+    return this.audioConfig.audioObjects.find(obj => obj.id == id);
+  }
+
+  setTargetAudioObject(varID, audioObjID){
+    let varObj = this.getVariable(varID);
+    varObj.mute();
+
+    this.removeMappings(varID);
+    varObj.targetAudioObject = this.getAudioObject(audioObjID);
+    return varObj;
+  }
+
+
+  setMapping(id, varObj, paramObj, data){
+    if(typeof varObj != "object"){varObj = this.getVariable(varObj)}
+    if(typeof paramObj != "object"){paramObj = this.getParameter(paramObj)}
+
+    let mapping = this.mappings.find(mapping => mapping.id == id);
+    if(mapping){
+      mapping.audioParameter = paramObj;
+
+    } else {
+      mapping = new AudioParameterMapping(varObj, paramObj, data);
+      this.mappings.push(mapping);
+    }
+    if(data){
+      mapping.update(data);
+    }
+    return mapping;
+  }
+
+  updateMapping(id, data, updateGUI = true){
+    let mapping = this.mappings.find(mapping => mapping.id == id);
+    if(!mapping){return}
+    mapping.update(data);
+
+    if(updateGUI){this.GUI.updateMapping(id, data)}
+    //this.replay({mute:false});
+  }
+
+  removeMapping(id){
+    let targetIndex;
+    this.mappings.forEach((item, i) => {
+      if(item.id == id){targetIndex = i}
+    });
+    if(typeof targetIndex !== "undefined"){
+      let mapping = this.mappings.splice(targetIndex, 1).pop();
+      mapping.audioParameter.target.setValueAtTime(mapping.audioParameter.target.defaultValue, 0); //mapping.audioParameter.default, 0);
+      //this.replay();
+    }
+  }
+
+  removeMappings(id){
+    let targetIDs = [];
+    this.mappings.forEach((item, i) => {
+      if(item.variable.id == id){targetIDs.push(i)}
+    });
+    targetIDs.reverse().forEach((item, i) => {
+      this.mappings.splice(item, 1);
+    });
+  }
+
+  removeVariable(id){
+    let targetIDs = [];
+    this._variables.forEach((item, i) => {
+      if(item.id == id){targetIDs.push(i)}
+    });
+    targetIDs.reverse().forEach((item, i) => {
+      this._variables.splice(item, 1);
+    });
+    this.removeMappings(id);
+  }
+
+  get data(){
+    return this._data;
+  }
+
+  pos2Time(pos){
+    return pos * this.duration;
+  }
+
+  col2Time(colID){
+    return colID / this._columnValues.length * this.duration;
+    if(this.dir == 1){
+      return colID / this._columnValues.length * this.duration;
+    } else {
+      return 1 - (colID / this._columnValues.length) * this.duration;
+    }
+
+  }
+
+  replay(data = {}){
+    data.mute = typeof data.mute == "undefined" ? true: data.mute;
+    if(this.animationTimeout){
+      this.stopPlayback(data);
+      this.play(data);
+    }
+  }
+
+  set duration(val){
+    this._duration = parseFloat(val);
+    this._duration = Math.max(1, val);
+    this.replay();
+  }
+
+  get duration(){
+    return this._duration;
+  }
+
+  muteAllAudioObjects(){
+    this.audioConfig.audioObjects.forEach(audioObject => {
+      if(audioObject.level == 2){audioObject.target.gain = 0}
+    });
+  }
+
+
+
+  play(data = {}){
+    data.dir = data.dir || this.dir;
+    data.mute = typeof data.mute == "undefined" ? true: data.mute;
+    if(data.dir != this.dir){
+      //this.stopPlayback(data);
+      this.dir = data.dir;
+    }
+
+    if(this.animationTimeout){return}
+
+    if(data.mute){this.audioMaster.gain = 1}
+    this._waxml.start();
+    this.mappings.filter(mapping => mapping.variable.state).forEach(mapping => {
+      mapping.variable.unMute();
+    });
+
+    if(this.GUI.scrubValue >= 1 && this.dir == 1){this.GUI.scrubValue = 0}
+    if(this.GUI.scrubValue <= 0 && this.dir == -1){this.GUI.scrubValue = 1}
+    this.pos = this.GUI.scrubValue;
+    // let relPos = this.GUI.scrubValue * this._columnValues.length;
+
+    //let offsetPos = (relPos % this._columnValues.length) / this._columnValues.length
+    // this.pos = this.GUI.scrubValue; // Math.floor(relPos) / this._columnValues.length;
+    // if(this.pos >= 1 && this.dir == 1){this.pos = 0}
+    // if(this.pos <= 0 && this.dir == -1){this.pos = 1}
+
+    // let currentTime = this.pos2Time(this.pos);
+    // let timePerColumn = this.duration / this._columnValues.length;
+    // let nextColumnID = Math.ceil(this._columnValues.length * this.pos);
+    // //let offsetTime = offsetPos * timePerColumn;
+    //
+    // let mappings = this.mappings.filter(mapping => mapping.variable.state && mapping.state);
+    // mappings.forEach(mapping => {
+    //   mapping.variable.unMute();
+    //   let values;
+    //   if(this.dir == 1){
+    //     values = mapping.variable.values.filter((item, i) => i >= nextColumnID);
+    //   } else {
+    //     values = mapping.variable.values.filter((item, i) => i <= nextColumnID);
+    //     values = values.reverse();
+    //   }
+    //
+    //   values.forEach((item, i) => {
+    //     let delay = this.col2Time(i); // + timePerColumn - offsetTime; // - currentTime;
+    //     let fadeTime = i ? timePerColumn / 2 : 0.001; // see https://developer.mozilla.org/en-US/docs/Web/API/AudioParam/setTargetAtTime
+    //     let startTime = Math.max(0, delay - fadeTime);
+    //     let val = item.val;
+    //     let output = mapping.mapValue(val);
+    //     //console.log(startTime, fadeTime, val, output);
+    //     mapping.audioParameter.parent.setTargetAtTime(mapping.audioParameter.name, output, startTime, fadeTime);
+    //     //mapping.audioParameter.target.setTargetAtTime(output, this._waxml._ctx.currentTime + startTime, fadeTime);
+    //   });
+    // });
+
+    // animate position
+    this.animationTimeout = setInterval(e => {
+      this.pos += (1 / (this.duration * 1000 / this.animationIntervalTime)) * this.dir;
+      this.GUI.scrubValue = this.pos;
+
+      if((this.pos >= 1 && this.dir == 1) || (this.pos <= 0 && this.dir == -1)){
+        this.stopPlayback();
+      } else {
+        this.scrub();
+      }
+    }, this.animationIntervalTime);
+
+  }
+
+  stopPlayback(data = {}){
+    data.mute = typeof data.mute == "undefined" ? true: data.mute;
+    this._waxml.stop();
+    if(data.mute){this.audioMaster.gain = 0}
+    if(this.animationTimeout){
+
+      clearInterval(this.animationTimeout);
+      this.animationTimeout = 0;
+
+      this.muteAllAudioObjects();
+      this.mappings.forEach(mapping => mapping.audioParameter.target.cancelScheduledValues(0));
+    }
+  }
+
+  stop(){
+    if(this.animationTimeout){
+      this.stopPlayback();
+    } else {
+      this.pos = 0;
+      this.GUI.scrubValue = this.pos;
+    }
+  }
+
+  scrub(e){
+    if(e){this.pos = parseFloat(e.target.value)}
+    this.mappings.filter(mapping => mapping.variable.state && mapping.state).forEach(mapping => {
+      let val = mapping.variable.relX2val(this.pos);
+      let output = mapping.mapValue(val);
+      mapping.audioParameter.parent.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+
+      //mapping.audioParameter.target.setTargetAtTime(output, 0, 0.01);
+    });
+  }
+  startScrub(){
+    this.stopPlayback();
+    this.audioMaster.gain = 1;
+    this._waxml.start();
+    this.mappings.filter(mapping => mapping.variable.state).forEach(mapping => {
+      mapping.variable.unMute();
+    });
+  }
+
+  updateParameters(y){
+
+  }
+
+  set GUI(gui){
+    this._gui = gui;
+  }
+
+  get GUI(){
+    return this._gui;
+  }
+
+
+	addEventListener(name, fn){
+		if(typeof name !== "string"){return}
+		if(typeof fn !== "function"){return}
+		this._listeners[name] = this._listeners[name] || [];
+		this._listeners[name].push(fn);
+	}
+
+	dispatchEvent(e){
+		this._listeners[e.type] = this._listeners[e.type] || [];
+		this._listeners[e.type].forEach(fn => fn(e));
+	}
+}
+
+
+module.exports = DataManager;
+
+},{"./AudioParameterMapping.js":1,"./FileManager.js":3,"./Variable.js":6}],3:[function(require,module,exports){
+
+
+class FileManager {
+
+  constructor(){
+
+  }
+
+  save(){
+    const fileHandle = this.getPath();
+  }
+
+  open(){
+    // const fileHandle = this.getPath();
+    // this.file = await fileHandle.getFile();
+    // let contents = await file.text();
+    // textArea.value = contents;
+  }
+
+  getPath(){
+    // let path = async () => {
+    //   // Destructure the one-element array.
+    //   [fileHandle] = await window.showOpenFilePicker();
+    //   // Do something with the file handle.
+    //   return fileHandle;
+    // };
+  }
+
+  getFile(src, fn){
+    fetch(src)
+    .then(response => response.text())
+    .then(json => fn(json));
+  }
+
+}
+
+
+module.exports = FileManager;
+
+},{}],4:[function(require,module,exports){
+var VisualDisplay = require('./VisualDisplay.js');
+
+class GUI {
+
+  constructor(selectors = {}){
+
+    this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F"];
+    this._colorID = 0;
+
+    window.onbeforeunload = () => {
+      return 'Are you sure you want to leave?';
+    };
+
+    this._elements = {};
+
+
+    Object.keys(selectors).forEach(key => {
+      let target = document.querySelectorAll(selectors[key]);
+      if(target.length < 2){target = document.querySelector(selectors[key])}
+      this._elements[key] = target;
+    });
+
+    // VisualDisplay
+    if(this._elements.canvas){
+      this.visualDisplay = new VisualDisplay(this._elements.canvas);
+    }
+
+
+    let row = document.createElement("div");
+    row.classList.add("variableContainer");
+    row.classList.add("lastVariableRow");
+    this._elements.lastVariableRow = row;
+    this._elements.variableRowContainer.appendChild(row);
+
+    this.addButton({
+      target: row,
+      label: "add variable",
+      fn: e => this.addVariableRow(),
+      class: ["addBtn"]
+    });
+
+    // ScrubSlider
+    if(this._elements.scrub){
+      this._elements.scrub.addEventListener("input", e => {
+        this._dataManager.scrub(e);
+      });
+      this._elements.scrub.addEventListener("pointerdown", e => {
+        this._dataManager.startScrub(e);
+      });
+      this._elements.scrub.addEventListener("pointerup", e => {
+        this._dataManager.stopPlayback();
+      });
+    }
+
+
+    // Duration input
+    if(this._elements.duration){
+      this._elements.duration.addEventListener("input", e => {
+        this._dataManager.duration = e.target.value;
+      });
+    }
+
+    if(this._elements.reverseBtn){
+      this._elements.reverseBtn.addEventListener("click", e => {
+        this._dataManager.play({dir:-1});
+      });
+    }
+    if(this._elements.playBtn){
+      this._elements.playBtn.addEventListener("click", e => {
+        this._dataManager.play({dir:1});
+      });
+    }
+
+    if(this._elements.stopBtn){
+      this._elements.stopBtn.addEventListener("click", e => {
+        this._dataManager.stop();
+      });
+    }
+
+    if(this._elements.openBtn){
+      this._elements.openBtn.addEventListener("click", e => {
+        this._elements.dataInputContainer.style.display = "block";
+        //fileManager.open();
+      });
+    }
+
+    if(this._elements.loadBtn){
+      this._elements.loadBtn.addEventListener("click", e => {
+        this._dataManager.setAllData(this._elements.dataInputContainer.querySelector("textarea").value);
+        this._elements.dataInputContainer.style.display = "none";
+      });
+    }
+
+    if(this._elements.saveBtn){
+      this._elements.saveBtn.addEventListener("click", e => {
+        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getAllData();
+        this._elements.dataOutputContainer.style.display = "block";
+      });
+    }
+
+    if(this._elements.closeBtn){
+      this._elements.closeBtn.forEach(el => {
+        el.addEventListener("click", e => {
+          e.target.parentNode.style.display = "none";
+        });
+      });
+    }
+  }
+
+  set dataManager(dm){
+    this._dataManager = dm;
+  }
+
+  initVariables(variables, options = {}){
+
+    while(this._elements.variableRowContainer.children.length > 1){
+      this._elements.variableRowContainer.removeChild(this._elements.variableRowContainer.firstChild);
+    }
+
+    variables.forEach(varObj => {
+      let row = this.addVariableRow(varObj, options);
+      this.selectVariable(row, varObj, options);
+    });
+  }
+
+  selectVariable(varRow, varObj, options){
+
+    varRow.style.backgroundColor = varObj.color;
+    varRow.classList.add("isset");
+
+    let menu = varRow.querySelector(".variable .variableSelector");
+    menu.querySelector("li > a").innerHTML =  varObj.name;
+
+    // active checkbox
+    this.setVariableState(varRow, varObj.state);
+
+    // audio object
+    this.selectAudioObject(varRow, varObj, options);
+
+    // update parameters
+    let parameterRows = varRow.querySelectorAll(".parameter");
+    if(parameterRows.length){
+      parameterRows.forEach(parameterRow => {
+        parameterRow.querySelectorAll(".input.multiSlider").forEach(el => {
+          el.parentNode.removeChild(el);
+        });
+
+        let nextSibling = variableRow.querySelector(".output.multiSlider");
+        let sliderData = {
+          min: varObj.min,
+          max: varObj.max,
+          class: "input"
+        }
+
+        this.addSlider(nextSibling,
+          sliderData,
+          values => {
+            this._dataManager.updateMapping(parameterRow.dataset.mappingId, {
+              inputLow: values[0],
+              inputHigh: values[1]
+            }, false);
+          }
+        );
+      });
+    } else {
+
+      // add new parameter rows
+      let parameters = varRow.querySelector(".parameters");
+      let mappingRowID = 0;
+      varObj.mappings.forEach(mappingObj => {
+        let paramObj = this._dataManager.getParameter(mappingObj.parameterID);
+        let paramRow = this.addParameterRow(parameters, varObj, mappingObj);
+        this.selectParameter(paramRow, varObj, paramObj, mappingObj);
+        //this.updateMapping(mappingRowID++, mappingObj);
+      });
+
+    }
+
+
+
+    this.draw();
+
+  }
+
+
+  setVariableState(varRow, state){
+    if(typeof varRow == "string"){
+      // if called from dataManager
+      varRow = this.getVariableRow(varRow);
+    }
+    state = state == false ? false : true;
+    varRow.style.opacity = state ? 1 : 0.5;
+    varRow.querySelector(".state").checked = state;
+    this.draw();
+  }
+
+  setGain(id, vol){
+    let row = this.getVariableRow(id);
+    let volumeSlider = row.querySelector(".volumeSlider");
+    volumeSlider.value = Math.pow(vol, 1/2);
+  }
+
+  updateMapping(id, mappingObj){
+    let row = this.getMappingRow(id);
+
+    if(typeof mappingObj.invert != "undefined"){
+      row.querySelector(".invertCheckBox").checked = mappingObj.invert;
+    }
+
+    if(typeof mappingObj.state != "undefined"){
+      row.style.opacity = mappingObj.state ? 1 : 0.5;
+      row.querySelector(".stateCheckBox").checked = mappingObj.state;
+    }
+
+    let multiSliderInput = row.querySelector(".multiSlider.input");
+    let minInput = multiSliderInput.querySelector("input.min");
+    let maxInput = multiSliderInput.querySelector("input.max");
+    let multiRangeInput = multiSliderInput.querySelector(".input.multirange.original");
+
+    if(typeof mappingObj.inputLow != "undefined"){
+      multiRangeInput.setAttribute("valueLow",mappingObj.inputLow);
+      minInput.value = mappingObj.inputLow;
+    }
+    if(typeof mappingObj.inputHigh != "undefined"){
+      multiRangeInput.setAttribute("valueHigh",mappingObj.inputHigh);
+      maxInput.value = mappingObj.inputHigh;
+    }
+
+    let multiSliderOutput = row.querySelector(".multiSlider.output");
+    let minOutput = multiSliderOutput.querySelector("input.min");
+    let maxOutput = multiSliderOutput.querySelector("input.max");
+    let multiRangeOutput = multiSliderOutput.querySelector(".output.multirange.original");
+    if(mappingObj.audioParameter){
+      if(typeof mappingObj.audioParameter.min != "undefined"){
+        multiRangeInput.min = mappingObj.audioParameter.min;
+      }
+      if(typeof mappingObj.audioParameter.max != "undefined"){
+        multiRangeInput.min = mappingObj.audioParameter.max;
+      }
+    }
+    if(typeof mappingObj.outputLow != "undefined"){
+      multiRangeInput.setAttribute("valueLow",mappingObj.outputLow);
+      minOutput.value = mappingObj.outputLow;
+    }
+    if(typeof mappingObj.outputHigh != "undefined"){
+      multiRangeInput.setAttribute("valueHigh",mappingObj.outputHigh);
+      minOutput.value = mappingObj.outputHigh;
+    }
+  }
+
+  getMappingRow(id){
+    return this._elements.variableRowContainer.querySelector(`.parameter[data-mapping-id='${id}']`);
+  }
+
+  getVariableRow(id){
+    return this._elements.variableRowContainer.querySelector(`.variableContainer[data-id='${id}']`);
+  }
+
+  addVariableRow(varObj, options){
+
+    let row = document.createElement("div");
+
+
+    // container for variable menu and all parameters
+    row.classList.add("variableContainer");
+    row.dataset.id = this._dataManager.variableID;
+
+    this._elements.variableRowContainer.insertBefore(row, this._elements.lastVariableRow);
+
+    let variable = document.createElement("div");
+    variable.classList.add("variable");
+    row.appendChild(variable);
+    let firstColumn = this._dataManager.firstColumn;
+    firstColumn.shift();
+
+    let variableSelector = this.addMenu(variable, [{name: "Select Variable", children: firstColumn}], (e) => {
+      let variableRow = e.target.closest(".variableContainer");
+      let varObj = this._dataManager.setVariable(variableRow.dataset.id, e.target.dataset.value, e.target.dataset.index);
+      this.selectVariable(variableRow, varObj);
+    });
+    variableSelector.classList.add("variableSelector");
+
+    let checkbox = document.createElement("input");
+    variable.appendChild(checkbox);
+    checkbox.setAttribute("type", "checkbox");
+    checkbox.checked = varObj ? varObj.state : true;
+    checkbox.classList.add("state");
+
+    checkbox.addEventListener("click", e => {
+      let varRow = e.target.closest(".variableContainer");
+      this._dataManager.setVariableState(varRow.dataset.id, e.target.checked);
+    });
+
+    let audioObjectMenu = this.addMenu(variable, [this._dataManager.audioConfig.tree], (e) => {
+      let varRow = e.target.closest(".variableContainer");
+      let varObj = this._dataManager.setTargetAudioObject(varRow.dataset.id, e.target.dataset.target);
+
+      this.selectAudioObject(varRow, varObj);
+    }, "Select Audio Object", [2]);
+    audioObjectMenu.classList.add("audioObjectSelector");
+
+    let volumeLabel = document.createElement("span");
+    volumeLabel.innerHTML = "Volume:";
+    volumeLabel.classList.add("volumeLabel");
+    variable.appendChild(volumeLabel);
+
+    let volumeSlider = document.createElement("input");
+    volumeSlider.setAttribute("type", "range");
+    volumeSlider.setAttribute("min", 0);
+    volumeSlider.setAttribute("max", 1);
+    volumeSlider.setAttribute("step", 1/100);
+    volumeSlider.setAttribute("value", varObj ? Math.pow(varObj.gain, 1/2) : 0.5);
+    volumeSlider.classList.add("volumeSlider");
+    volumeSlider.addEventListener("input", e => {
+      let varRow = e.target.closest(".variableContainer");
+      this._dataManager.setGain(varRow.dataset.id, Math.pow(e.target.value, 2), false);
+    });
+    variable.appendChild(volumeSlider);
+    //this.addMenu(variable, [{name: "Display group", children: this._dataManager.displayGroups}], (e) => this.selectVariable(e));
+
+    this.addButton({
+      target: variable,
+      label: "X",
+      fn: e => this.removeVariable(row),
+      class: ["removeBtn"]
+    });
+
+    let parameters = document.createElement("div");
+    parameters.classList.add("parameters");
+    row.appendChild(parameters);
+
+    this.addButton({
+      target: row,
+      label: "add parameter",
+      fn: e => {
+        let varObj = this._dataManager.getVariable(row.dataset.id) || {};
+        this.addParameterRow(parameters, varObj)
+      },
+      class: ["addBtn", "param"]
+    });
+
+    if(varObj){
+      row.style.backgroundColor = varObj.color;
+      this.selectVariable(row, varObj, options);
+    }
+    return row;
+  }
+
+
+  addParameterRow(parent, varObj, mappingObj){
+    let row = document.createElement("div");
+    row.classList.add("parameter");
+    if(mappingObj){
+      row.classList.add("isset");
+    }
+
+    //this._dataManager.audioConfig.tree.name = "Select Parameter";
+    let parameterMenu = this.addMenu(row, [varObj.targetAudioObject], (e) => {
+      let row = e.target.closest(".parameter");
+      let paramObj = this._dataManager.getParameter(e.target.dataset.target);
+
+      let mappingObj = this._dataManager.setMapping(row.dataset.mappingId, varObj.id, paramObj.id);
+      this.selectParameter(row, varObj, paramObj, mappingObj);
+
+    }, "Select Parameter");
+
+    parameterMenu.classList.add("parameterSelect");
+    parent.appendChild(row);
+
+    // parameter active switch
+    let checkbox = document.createElement("input");
+    row.appendChild(checkbox);
+    checkbox.setAttribute("type", "checkbox");
+    checkbox.checked = mappingObj ? mappingObj.state : true;
+    checkbox.classList.add("stateCheckBox");
+
+    checkbox.addEventListener("click", e => {
+      let row = e.target.closest(".parameter");
+      this._dataManager.updateMapping(row.dataset.mappingId, {state: e.target.checked});
+    });
+
+    let menu = this.addMenu(row, GUI.curveTypes, e => {}, "Curve Type");
+    menu.classList.add("curveType");
+
+
+    // variable input
+    let min = varObj.min || 0;
+    let max = varObj.max || 100;
+    let sliderData = {
+      min: min,
+      max: max,
+      valueLow: mappingObj ? mappingObj.inputLow : min,
+      valueHigh: mappingObj ? mappingObj.inputHigh : max,
+      class: "input"
+    };
+
+    this.addSlider(menu,
+      sliderData,
+      values => {
+        this._dataManager.updateMapping(row.dataset.mappingId, {
+          inputLow: values[0],
+          inputHigh: values[1]
+        }, false);
+      }
+    );
+
+    // audio parameter output
+    // this.addSlider(menu, {min: 0, max: 100, class: "output"});
+
+
+    checkbox = document.createElement("input");
+    row.appendChild(checkbox);
+    checkbox.setAttribute("type", "checkbox");
+    checkbox.checked = false;
+    checkbox.setAttribute("name", "invertCheckBox");
+    checkbox.classList.add("invertCheckBox");
+
+    checkbox.addEventListener("click", e => {
+      let row = e.target.closest(".parameter");
+      this._dataManager.updateMapping(row.dataset.mappingId, {
+        invert: e.target.checked
+      }, false);
+    });
+
+    let checkBoxLabel = document.createElement("label");
+    checkBoxLabel.innerHTML = "Invert"
+    checkBoxLabel.setAttribute("for", "invertCheckBox");
+    row.appendChild(checkBoxLabel);
+
+    let btn = this.addButton({
+      target: row,
+      label: "X",
+      fn: e => this.removeParameterRow(row),
+      class: ["removeBtn"]
+    });
+
+    return row;
+  }
+
+  removeParameterRow(row){
+    if(confirm("Do you want to remove paramater?")){
+      this._dataManager.removeMapping(row.dataset.mappingId);
+      row.parentNode.removeChild(row);
+    }
+  }
+
+  selectAudioObject(variableContainer, varObj, options = {}){
+
+    if(!varObj.targetAudioObject){return}
+
+    let parameterRow = variableContainer.querySelector(".parameters");
+
+    let ok = options.warnings == false || !parameterRow.firstChild || confirm("Do you want to reset audio object? (including resetting parameters)");
+    if(ok){
+
+      while(parameterRow.firstChild) {
+        // remove previous parameter rows
+        parameterRow.removeChild(parameterRow.firstChild);
+      }
+
+      variableContainer.classList.add("hasAudioObject");
+      let menu = variableContainer.querySelector(".audioObjectSelector");
+      menu.querySelector("li > a").innerHTML = varObj.targetAudioObject.name; //e.target.dataset.value;
+
+    }
+
+  }
+
+
+  selectParameter(row, varObj, paramObj, mappingObj){
+
+    let menu = row.querySelector(".parameterSelect");
+    let variableContainer = row.closest(".variableContainer");
+
+    row.querySelectorAll(".output.multiSlider").forEach(el => {
+      let nextSibling = el.nextSibling;
+      el.parentNode.removeChild(el);
+    });
+
+    row.dataset.target = paramObj.id;
+    row.classList.add("isset");
+
+    //let parentMenuObject = e.target.closest(".parent").querySelector("a");
+    //
+    // if(!paramObj.parent){
+    //   console.log(paramObj.parent);
+    //   return;
+    // }
+    menu.querySelector("li > a").innerHTML = `${paramObj.parent.name}.${paramObj.name}`;
+    // `${parentMenuObject.innerHTML}.${e.target.innerHTML}`;
+    //`${paramObj.parent._nodeType}.${paramObj.name}`;
+
+    //e.target.innerHTML; //e.target.dataset.value;
+
+    //let varObj = this._dataManager.getVariable(variableContainer.dataset.id);
+
+
+    let mappingID;
+    if(mappingObj){
+      mappingID = mappingObj.id;
+      row.dataset.mappingId = mappingID;
+    }
+
+
+    let invertCheckBox = row.querySelector(".invertCheckBox");
+    if(mappingObj){
+      invertCheckBox.checked = mappingObj.invert;
+    }
+
+    let sliderData = {
+      // min: typeof varObj.min != "undefined" ? varObj.min : mappingObj.audioParameter.min,
+      // max: typeof varObj.max != "undefined" ? varObj.max : mappingObj.audioParameter.max,
+      min: mappingObj.audioParameter ? mappingObj.audioParameter.min : varObj.min,
+      max: mappingObj.audioParameter ? mappingObj.audioParameter.max : varObj.max,
+      valueLow: typeof mappingObj.outputLow != "undefined" ? mappingObj.outputLow : paramObj.min,
+      valueHigh: typeof mappingObj.outputHigh != "undefined" ? mappingObj.outputHigh : paramObj.max,
+      class: "output",
+      conv: paramObj.conv
+    }
+
+    this.addSlider(invertCheckBox,
+      sliderData,
+      values => {
+        this._dataManager.updateMapping(mappingID, {
+          outputLow: values[0],
+          outputHigh: values[1],
+        }, false);
+      }
+    );
+
+
+  }
+
+
+
+  setAttributes(el, attr = {}){
+      Object.entries(attr).forEach(entry => {
+        el.setAttribute(entry[0], entry[1]);
+      });
+  }
+
+  removeVariable(row){
+    if(confirm("Do you want to remove variable? (including resetting parameters)")){
+      this._dataManager.removeVariable(row.dataset.id);
+      this._elements.variableRowContainer.removeChild(row);
+      this.draw();
+    }
+  }
+
+
+  addButton(data){
+    if(!data.target){return}
+    let btn = document.createElement("button");
+    btn.innerHTML = data.label || "+";
+    (data.class || ["btn"]).forEach((item, i) => btn.classList.add(item));
+
+    data.target.appendChild(btn);
+    btn.addEventListener("click", data.fn || (e => {}));
+    return btn;
+  }
+
+  addSlider(sibling, attr = {}, fn = e => {}){
+    attr.min = typeof attr.min != "undefined" ? attr.min : 0;
+    attr.max = typeof attr.max != "undefined" ? attr.max : 100;
+    attr.step = (attr.max - attr.min) / (attr.steps || 100);
+
+    attr.valueLow = typeof attr.valueLow != "undefined" ? attr.valueLow : attr.min;
+    attr.valueHigh = typeof attr.valueHigh != "undefined" ? attr.valueHigh :attr.max;
+
+    let span = document.createElement("span");
+    span.classList.add("multiSlider");
+    if(attr.class){span.classList.add(attr.class)}
+    sibling.parentNode.insertBefore(span, sibling);
+    //span.innerHTML = label;
+
+    let minInput = document.createElement("input");
+    minInput.classList.add("min");
+    minInput.value = attr.valueLow;
+    span.appendChild(minInput);
+
+    let el = document.createElement("input");
+    attr.type = "range";
+    this.setAttributes(el, attr);
+    span.appendChild(el);
+    multirange(el);
+
+    // el.setAttribute("valueLow", attr.valueLow);
+    // el.setAttribute("valueHigh", attr.valueHigh);
+    // el.valueLow = attr.valueLow;
+    // el.valueHigh = attr.valueHigh;
+
+    el.valueLow = this.sliderValueConversion(el, attr.valueLow);
+    el.valueHigh = this.sliderValueConversion(el, attr.valueHigh);
+
+    let getLowAndHigh = () => {
+      return [el.valueLow, el.valueHigh].map(val => {
+        let min = parseFloat(el.min);
+        let max = parseFloat(el.max);
+        let range = max - min;
+        let x = (val - min) / range;
+        let powVal = parseFloat(el.getAttribute("conv")) || 1;
+        x = Math.pow(x, powVal);
+        x = x * (max - min) + min;
+        if(range>100){
+          x = Math.round(x);
+        } else if(range > 2){
+          x = x.toFixed(1);
+        } else {
+          x = x.toFixed(3);
+        }
+        return x;
+      });
+    }
+
+
+    el.addEventListener("input", e => {
+      let val = getLowAndHigh();
+      minInput.value = val[0];
+      maxInput.value = val[1];
+      fn(val);
+    });
+    el.nextSibling.addEventListener("input", e => {
+      let val = getLowAndHigh();
+      minInput.value = val[0];
+      maxInput.value = val[1];
+      fn(val);
+    });
+
+    let maxInput = document.createElement("input");
+    maxInput.classList.add("max");
+    maxInput.value = attr.valueHigh;
+    span.appendChild(maxInput);
+
+    minInput.addEventListener("change", e => {
+      setLowAndHigh();
+    });
+
+    maxInput.addEventListener("change", e => {
+      setLowAndHigh();
+    });
+
+
+    let setLowAndHigh = () => {
+      let min = parseFloat(el.min);
+      let max = parseFloat(el.max);
+      let range = max - min;
+
+      let valueLow = Math.max(min, parseFloat(minInput.value));
+      let valueHigh = Math.min(max, parseFloat(maxInput.value));
+      minInput.value = valueLow;
+      maxInput.value = valueHigh;
+
+      let values = [valueLow, valueHigh];
+      fn(values);
+      values.map(val => {
+        let min = parseFloat(el.min);
+        let max = parseFloat(el.max);
+        let range = max - min;
+        let x = (val - min) / range;
+
+        let powVal = parseFloat(el.getAttribute("conv")) || 1;
+        x = Math.pow(x, 1/powVal);
+        x = x * (max - min) + min;
+
+        return x;
+      });
+
+      el.setAttribute("valueLow", values[0]);
+      el.setAttribute("valueHigh", values[1]);
+    }
+
+  }
+
+  sliderValueConversion(el, val){
+    let min = parseFloat(el.min);
+    let max = parseFloat(el.max);
+    let range = max - min;
+    let x = (val - min) / range;
+    let powVal = parseFloat(el.getAttribute("conv")) || 1;
+    x = Math.pow(x, 1/powVal);
+    x = x * (max - min) + min;
+    return x;
+  }
+
+
+  addMenu(parent, options, fn, label, filter = []){
+
+      // options is an single or multidimensional Array
+      // if single, all values are treated as the labels
+      // if multidimensional, each entry should be an object
+      // {name: label, children: subMenu}
+      let ul = document.createElement("ul");
+      ul.classList.add("menu");
+      parent.appendChild(ul);
+      let level = 0;
+      this.addOptions(ul, options, fn, label, level, filter);
+      return ul;
+  }
+
+  addOptions(parent, options = [], fn, label, level, filter = []){
+
+    let curOptions = [];
+    let index = 0;
+    options.forEach(option => {
+      if(!option){
+        console.log(option);
+        return;
+      }
+      let includeOption = filter.length ? filter.filter(item => item == option.type || item == option.level || option.level == 1)[0] : true;
+      if(level == 1 && option.target instanceof AudioParam){includeOption = false} // omit AudioParameter from top level AudioObjects
+
+      if(includeOption){
+        curOptions.push(option);
+        let a = document.createElement("a");
+        let name = option.name ? option.name : option;
+        a.innerHTML = level ? name : (label ? label : name); // top level can have specified label
+
+        let li = document.createElement("li");
+        parent.appendChild(li);
+        li.appendChild(a);
+        let parentLi = a.closest("li.parent");
+        let parentValue;
+        if(parentLi){
+          parentValue = parentLi.querySelector("a").dataset.value;
+        }
+        a.dataset.value = (parentValue ? parentValue + " > " : "") + name;
+        a.dataset.target = option.id;
+        a.dataset.level = level;
+        a.dataset.index = index++;
+
+        let ul = document.createElement("ul");
+        let childOptions = this.addOptions(ul, option.children, fn, label, level + 1, filter);
+
+        if(childOptions.length){
+          li.classList.add("parent");
+
+          let span = document.createElement("span");
+          span.classList.add("expand");
+          span.innerHTML = "»";
+          a.appendChild(span);
+
+          ul.classList.add("child");
+          li.appendChild(ul);
+
+        } else {
+          a.href = "#";
+          a.addEventListener("pointerdown", fn);
+        }
+
+
+      }
+    });
+    return curOptions;
+  }
+
+
+  set visualDisplay(vd){
+    this._visualDisplay = vd;
+  }
+
+  get visualDisplay(){
+    return this._visualDisplay;
+  }
+
+  draw(){
+    this._visualDisplay.draw(this._dataManager.activeVariables);
+  }
+
+
+  set scrubValue(val){
+    this._elements.scrub.value = val;
+  }
+
+  get scrubValue(){
+    return parseFloat(this._elements.scrub.value);
+  }
+
+  get duration(){
+    return parseFloat(this._elements.duration.value);
+  }
+
+  set duration(val){
+    this._elements.duration.value = val;
+    this._dataManager.duration = val;
+  }
+
+  get color(){
+    return this._colors[this._colorID++ % this._colors.length];
+  }
+
+
+}
+
+
+
+
+GUI.curveTypes = [
+  {
+    name:"Linear",
+    children: [
+      {name:"Linear"},
+      {name:"Exponential"},
+      {name:"Bell curve"},
+      {name:"Gate"},
+      {name:"MIDI"}
+    ]
+  }
+];
+
+
+
+module.exports = GUI;
+
+},{"./VisualDisplay.js":7}],5:[function(require,module,exports){
+var FileManager = require('./FileManager.js');
+var DataManager = require('./DataManager.js');
+var GUI = require('./GUI.js');
+
+
+
+var dataManager;
+var webAudioConfig;
+var fileManager = new FileManager();
+var gui = new GUI({
+  variableRowContainer: "#variables",
+  canvas: "#visual-output canvas",
+  scrub: "#scrub",
+  duration: "#duration",
+  reverseBtn: "#reverseBtn",
+  playBtn: "#playBtn",
+  stopBtn: "#stopBtn",
+  openBtn: "#openBtn",
+  saveBtn: "#saveBtn",
+  loadBtn: "#data-input-container .loadBtn",
+  closeBtn: ".data-container .closeBtn",
+  dataInputContainer: "#data-input-container",
+  dataOutputContainer: "#data-output-container"
+});
+
+
+webAudioXML.addEventListener("inited", e => {
+  let dm = new DataManager("data.csv", webAudioXML, gui);
+  dm.addEventListener("inited", e => {
+    // init settings
+    fileManager.getFile("configuration.json", json => dm.setAllData(json));
+  });
+});
+
+},{"./DataManager.js":2,"./FileManager.js":3,"./GUI.js":4}],6:[function(require,module,exports){
+
+class Variable {
+  constructor(name, data, colVals){
+
+    // make it possible to have data with gaps by allowing for each
+    // value to have its own y value (time position)
+
+    this.id = data.id;
+    this.rowID = data.rowID;
+    this.displayGroup = data.id+1;
+    this.name = name;
+    this._state = data ? data.state : true;
+    this.color = data.color;
+    this.mappings = [];
+    this.unit = data.unit;  // not used
+    this._colVals = colVals;
+    this.gain = data ? data.gain : 0.25;
+    this.values = [];
+    this.update(name, data);
+  }
+
+  update(name, data){
+
+    // empty old values
+    while(this.values.length){
+      this.values.pop();
+    }
+
+    this.name = name;
+    delete(this.min);
+    delete(this.max);
+    delete(this.minCol);
+    delete(this.maxCol);
+    let x = 0;
+
+    (data.values || []).forEach(valObj => {
+      let col, val;
+
+      if(typeof valObj == "object"){
+        col = valObj.col;
+        val = valObj.val;
+      }
+      if(typeof col == "undefined"){
+        col = this._colVals[x++];
+        val = valObj;
+      }
+      if(typeof this.min == "undefined"){this.min = val}
+      if(typeof this.max == "undefined"){this.max = val}
+      if(typeof this.minCol == "undefined"){this.minCol = col}
+      if(typeof this.maxCol == "undefined"){this.maxCol = col}
+      this.min = Math.min(this.min, val);
+      this.max = Math.max(this.max, val);
+      this.minCol = Math.min(this.minCol, col);
+      this.maxCol = Math.max(this.maxCol, col);
+      this.values.push({col: col, val: val});
+    });
+  }
+
+
+  relX2val(x){
+    let col = x * (this.maxCol - this.minCol) +  this.minCol;
+    let valObj = this.values.find(entry => entry.col == col);
+    if(valObj){
+      return valObj.val;
+    } else {
+      // interpolate between two values
+      let val1 = this.values.filter(entry => entry.col < col).pop();
+      let val2 = this.values.find(entry => entry.col > col);
+      if(typeof val1 == "undefined"){val1 = this.values[0].col}
+      if(typeof val2 == "undefined"){val2 = this.values[this.values.length-1].col}
+
+      let relColDiff = (col-val1.col)/(val2.col-val1.col);
+      let valDiff = val2.val - val1.val;
+      return val1.val + valDiff * relColDiff;
+    }
+  }
+
+  unMute(){
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = this.gain;
+    }
+  }
+
+  mute(){
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = 0;
+    }
+  }
+
+  get state(){
+    return this._state;
+  }
+
+  set state(_state){
+    this._state = _state;
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = _state ? this.gain : 0;
+    }
+  }
+
+  get data(){
+    return {
+      name: this.name,
+      id: this.id,
+      rowID: this.rowID,
+      gain: this.gain,
+      state: this.state,
+      color: this.color,
+      audioObjectID: this.targetAudioObject ? this.targetAudioObject.id : 0
+    };
+  }
+
+  set gain(val){
+    this._gain = val;
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = val;
+    }
+  }
+
+  get gain(){
+    return this._gain;
+  }
+
+}
+
+
+module.exports = Variable;
+
+},{}],7:[function(require,module,exports){
+class VisualDisplay {
+  constructor(canvas){
+    this._canvas = canvas;
+    this.relative = true;
+    this._ctx = canvas.getContext("2d");
+    this._ctx.lineWidth = 3;
+
+    canvas.addEventListener("click", e => {
+      this.switchMode();
+    });
+  }
+
+  switchMode(){
+    this.relative = !this.relative;
+    this.draw();
+  }
+
+
+  draw(variables = this.lastUsedVariables){
+    this.clear();
+    if(!variables){return}
+
+    this.lastUsedVariables = variables;
+
+    let globalMin;
+    variables.forEach((item, i) => {
+      if(typeof globalMin == "undefined"){globalMin = item.min}
+      globalMin = Math.min(globalMin, item.min);
+    });
+
+    let globalMax;
+    variables.forEach((item, i) => {
+      if(typeof globalMax == "undefined"){globalMax = item.max}
+      globalMax = Math.max(globalMax, item.max);
+    });
+
+
+    variables.forEach(varObj => {
+      this._ctx.beginPath();
+      this._ctx.strokeStyle = varObj.color;
+
+      let xOffset = varObj.minCol;
+      let xRange = varObj.maxCol - varObj.minCol;
+
+      let yOffset = this.relative ? varObj.min : globalMin;
+      let yRange = this.relative ? varObj.max - varObj.min : globalMax - globalMin;
+
+      varObj.values.forEach((valueObj, i) => {
+        let x = (valueObj.col - xOffset)/xRange * this._canvas.width;
+        let y = (1 - (valueObj.val - yOffset)/yRange) * this._canvas.height;
+        if(i==0){
+          // first point
+          this._ctx.moveTo(x,y);
+        } else {
+          // other points
+          this._ctx.lineTo(x,y);
+        }
+
+
+        this._ctx.stroke();
+      });
+    });
+
+  }
+
+  clear(){
+    this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+  }
+
+  set gain(vol){
+    if(this.targetAudioObject){
+      this.targetAudioObject.target.gain = vol;
+    }
+  }
+
+}
+
+module.exports = VisualDisplay;
+
+},{}]},{},[5]);
