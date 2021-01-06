@@ -2,9 +2,40 @@
 <Audio version="1.0" timeUnit="ms" gain="-10dB">
 
 
+	<!--
+	This simple oscillator configuration uses a sawtooth
+	waveform and plays through a lowpass filter and a stereopannernode.
+
+	Effective parameters to control are:
+
+	OscillatorNode.frequency or detune for pitch
+	BiquadFilterNode.frequency or detune for timbre
+	StereoPannerNode.pan for panning
+  -->
+
+	<Chain id="Oscillator_Sawtooth">
+		<OscillatorNode type="sawtooth"></OscillatorNode>
+		<BiquadFilterNode></BiquadFilterNode>
+		<StereoPannerNode></StereoPannerNode>
+	</Chain>
+
+
 	<Chain id="Worklet_Noise1">
 
 		<!--
+
+		This configuration plays white noise using an AudioWorkletNode playing
+		band-pass BiquadFilterNode with Q set to 70 giving a whistling effect.
+		The signal is routed through a GainNode and a StereoPannerNode to add
+		accesspoints for modulation.
+
+		Useful parameters to control are:
+
+		BiquadFilterNode.frequency or detune for brightness
+		BiquadFilterNode.Q for the screeming effect
+		GainNode.gain for volume
+		StereoPannerNode.pan for panning
+
 		The AudioWorkletNode can generate any sound from a javascript object.
 		The example script below generates white noise by adding random sample
 		values to the audio buffer. (This is quite advanced and is not recommended
@@ -49,6 +80,12 @@
 		The first Chain contains an OscillatorNode that is sent through a BiquadFilterNode.
 		The second Chain contains an OscillatorNode that is used to modulate the filter in
 		first Chain.
+
+		Useful parameters to control are:
+
+		Carrier.OscillatorNode.frequency or detune for pitch
+		Modulator.modulatorInput1.gain for vibrator
+
 		-->
 		<Chain class="Carrier">
 			<!-- The OscillatorNode generates a pitched, electronical sound.  (Read more on https://developer.mozilla.org/en-US/docs/Web/API/OscillatorNode)
@@ -108,6 +145,11 @@
 		The "playbackRate" attribute can be set to a fixed value or controlled by the
 		WebAudioXML Sonification Toolkit. "1" is normal speed. "2" is double. "0" stops
 		the playback and negative values playes the audio backwards.
+
+		Useful parameters to control are:
+
+		AudioBufferSourceNode.playbackRate for pitch
+		BiquadFilterNode.frequency or detune for timbre
 		-->
 
 		<AudioBufferSourceNode src="audio/loop1.mp3" loop="true"></AudioBufferSourceNode>
@@ -130,6 +172,13 @@
 			files playing back one after another.
 			By setting voiceselect="random" the files will be randomly selected.
 			There can be any number of voices with different files.
+
+			Useful parameters to control are:
+
+			Synth.trigger for trigger speed
+			BiquadFilterNode.frequency or detune for timbre
+			StereoPannerNode.pan for stereo panning
+			ReverbSend.gain for reverb control
 			-->
 			<Synth voiceselect="next">
 				<Voice>
@@ -139,6 +188,8 @@
 					<AudioBufferSourceNode src="audio/step2.mp3"></AudioBufferSourceNode>
 				</Voice>
 			</Synth>
+
+			<BiquadFilterNode type="lowpass" frequency="20000"></BiquadFilterNode>
 
 			<StereoPannerNode></StereoPannerNode>
 
@@ -151,7 +202,7 @@
 			it to "0.25" as in this example turns the reverb level down from the beginning.
 			(Read more about routing signals: https://github.com/hanslindetorp/WebAudioXML/wiki/Connecting)
 			-->
-			<Send output="#reverb1" gain="0"></Send>
+			<Send class="ReverbSend" output="#reverb1" gain="0"></Send>
 
 			<!--
 			By having a GainNode AFTER the ReverbSend, the dry (without reverb) level can

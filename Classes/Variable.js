@@ -5,16 +5,21 @@ class Variable {
     // make it possible to have data with gaps by allowing for each
     // value to have its own y value (time position)
 
-    this.id = data.id;
+    if(typeof data.id != "undefined"){
+      // auto increase counter if initing from stored data
+      Variable.cnt = Math.max(Variable.cnt, parseInt(data.id));
+    }
+
+    this.id = Variable.cnt++;
     this.rowID = data.rowID;
-    this.displayGroup = data.id+1;
+    this.displayGroup = parseInt(data.id)+1;
     this.name = name;
-    this._state = data ? data.state : true;
+    this._state = typeof data.state != "undefined" ? data.state : true;
     this.color = data.color;
     this.mappings = [];
     this.unit = data.unit;  // not used
     this._colVals = colVals;
-    this.gain = data ? data.gain : 0.25;
+    this.gain = typeof data.gain != "undefined" ? data.gain : 0.25;
     this.values = [];
     this.update(name, data);
   }
@@ -123,5 +128,6 @@ class Variable {
 
 }
 
+Variable.cnt = 0;
 
 module.exports = Variable;

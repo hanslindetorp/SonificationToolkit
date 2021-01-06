@@ -8,7 +8,11 @@ class AudioParameterMapping {
   }
 
   init(varObj, paramObj, data){
-    this.id = typeof data.id == "undefined" ? AudioParameterMapping.cnt++ : data.id;
+    if(typeof data.id != "undefined"){
+      // auto increase counter if initing from stored data
+      AudioParameterMapping.cnt = Math.max(AudioParameterMapping.cnt, parseInt(data.id));
+    }
+    this.id = AudioParameterMapping.cnt++;
     this.state = typeof data.state == "undefined" ? true : data.state;
     this.invert = typeof data.invert == "undefined" ? false : data.invert;
 
@@ -247,6 +251,26 @@ class DataManager {
     }
   }
 
+  new(){
+    let OK = true;
+    if(this._variables.length){
+      OK = confirm("Do you want to clear your current configuration?");
+    }
+    if(OK){
+
+      while(this._variables.length){
+        let varObj = this._variables.pop();
+        varObj.mute();
+        this.removeVariable(varObj.id)
+      }
+
+      this.GUI.clear();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   setAllData(json){
 
     let data;
@@ -257,23 +281,16 @@ class DataManager {
         return;
     }
 
-    let OK = true;
-    if(this._variables.length){
-      OK = confirm("Do you want to replace your current configuration?");
-    }
+    let OK = this.new();
     if(OK){
-      while(this._variables.length){
-        let varObj = this._variables.pop();
-        varObj.mute();
-        this.removeVariable(varObj.id)
-      }
+
       this.variableID = 0;
       this.duration = data.duration || 60;
       this.GUI.duration = this.duration;
 
       let id = 0;
       data.variableMappings.forEach(varData => {
-        let varObj = this.setVariable(varData.rowID, varData.name, varData.id, varData);
+        let varObj = this.setVariable(varData.id, varData.name, varData.rowID, varData);
         this.setTargetAudioObject(varData.id, varData.audioObjectID);
 
         varData.mappings.forEach(mapping => {
@@ -305,11 +322,11 @@ class DataManager {
   }
 
   get variableID(){
-    return this._variableID++;
+    return Variable.cnt;
   }
 
   set variableID(val){
-    this._variableID = val;
+    Variable.cnt = val;
   }
 
   setVariable(id, varName, rowID, varData){
@@ -325,12 +342,13 @@ class DataManager {
     } else {
       if(varData){
         varData.values = values;
+        this.GUI.useColor(varData.color);
       } else {
         varData = {
           values: values,
           id: id,
           rowID: rowID,
-          color: this.GUI.color
+          color: this.GUI.nextColor()
         }
       }
       varObj = new Variable(varName, varData, this._columnValues);
@@ -434,7 +452,10 @@ class DataManager {
   removeVariable(id){
     let targetIDs = [];
     this._variables.forEach((item, i) => {
-      if(item.id == id){targetIDs.push(i)}
+      if(item.id == id){
+        item.mute();
+        targetIDs.push(i)
+      }
     });
     targetIDs.reverse().forEach((item, i) => {
       this._variables.splice(item, 1);
@@ -673,7 +694,6 @@ class GUI {
   constructor(selectors = {}){
 
     this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F"];
-    this._colorID = 0;
 
     window.onbeforeunload = () => {
       return 'Are you sure you want to leave?';
@@ -745,6 +765,12 @@ class GUI {
       });
     }
 
+    if(this._elements.newBtn){
+      this._elements.newBtn.addEventListener("click", e => {
+        this._dataManager.new();
+      });
+    }
+
     if(this._elements.openBtn){
       this._elements.openBtn.addEventListener("click", e => {
         this._elements.dataInputContainer.style.display = "block";
@@ -779,11 +805,16 @@ class GUI {
     this._dataManager = dm;
   }
 
-  initVariables(variables, options = {}){
-
+  clear(){
     while(this._elements.variableRowContainer.children.length > 1){
       this._elements.variableRowContainer.removeChild(this._elements.variableRowContainer.firstChild);
     }
+    this._visualDisplay.draw([]);
+  }
+
+  initVariables(variables, options = {}){
+
+    this.clear();
 
     variables.forEach(varObj => {
       let row = this.addVariableRow(varObj, options);
@@ -795,6 +826,7 @@ class GUI {
 
     varRow.style.backgroundColor = varObj.color;
     varRow.classList.add("isset");
+    this._elements.lastVariableRow.style.display = "block";
 
     let menu = varRow.querySelector(".variable .variableSelector");
     menu.querySelector("li > a").innerHTML =  varObj.name;
@@ -844,8 +876,6 @@ class GUI {
 
     }
 
-
-
     this.draw();
 
   }
@@ -858,6 +888,11 @@ class GUI {
     }
     state = state == false ? false : true;
     varRow.style.opacity = state ? 1 : 0.5;
+    if(state){
+      varRow.classList.remove("inactive");
+    } else {
+      varRow.classList.add("inactive");
+    }
     varRow.querySelector(".state").checked = state;
     this.draw();
   }
@@ -928,10 +963,12 @@ class GUI {
 
     let row = document.createElement("div");
 
+    // hide "add variable button temporarily"
+    this._elements.lastVariableRow.style.display = "none";
 
     // container for variable menu and all parameters
     row.classList.add("variableContainer");
-    row.dataset.id = this._dataManager.variableID;
+    row.dataset.id = varObj ? varObj.id : this._dataManager.variableID;
 
     this._elements.variableRowContainer.insertBefore(row, this._elements.lastVariableRow);
 
@@ -1453,9 +1490,20 @@ class GUI {
   }
 
   get color(){
-    return this._colors[this._colorID++ % this._colors.length];
+    return this._colors[0];
   }
 
+  nextColor(){
+    let col = this._colors.shift();
+    this._colors.push(col);
+    return col;
+  }
+
+  useColor(col){
+    let i = this._colors.indexOf(col);
+    this._colors.splice(i, 1);
+    this._colors.push(col);
+  }
 
 }
 
@@ -1497,6 +1545,7 @@ var gui = new GUI({
   reverseBtn: "#reverseBtn",
   playBtn: "#playBtn",
   stopBtn: "#stopBtn",
+  newBtn: "#newBtn",
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
   loadBtn: "#data-input-container .loadBtn",
@@ -1522,16 +1571,21 @@ class Variable {
     // make it possible to have data with gaps by allowing for each
     // value to have its own y value (time position)
 
-    this.id = data.id;
+    if(typeof data.id != "undefined"){
+      // auto increase counter if initing from stored data
+      Variable.cnt = Math.max(Variable.cnt, parseInt(data.id));
+    }
+
+    this.id = Variable.cnt++;
     this.rowID = data.rowID;
-    this.displayGroup = data.id+1;
+    this.displayGroup = parseInt(data.id)+1;
     this.name = name;
-    this._state = data ? data.state : true;
+    this._state = typeof data.state != "undefined" ? data.state : true;
     this.color = data.color;
     this.mappings = [];
     this.unit = data.unit;  // not used
     this._colVals = colVals;
-    this.gain = data ? data.gain : 0.25;
+    this.gain = typeof data.gain != "undefined" ? data.gain : 0.25;
     this.values = [];
     this.update(name, data);
   }
@@ -1640,6 +1694,7 @@ class Variable {
 
 }
 
+Variable.cnt = 0;
 
 module.exports = Variable;
 

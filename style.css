@@ -101,7 +101,15 @@ input.multirange {
 }
 #variables .variableContainer {
 	margin: 3px 0px;
+	opacity: 1;
 	/* overflow: auto; */
+}
+#variables .variableContainer.inactive {
+	opacity: 0.5;
+	pointer-events: none;
+}
+#variables .variableContainer.inactive input.state {
+	pointer-events: auto;
 }
 #variables {
 	font-size: 0.8em;
@@ -131,7 +139,13 @@ input.multirange {
 	margin-top: 7px;
 }
 
+#variables .variableContainer.inactive .parameters {
+	display: none;
+}
 
+#variables .variableContainer.inactive .param.addBtn {
+	display: none;
+}
 #variables .parameters {
 	padding-left: 30px;
 }
@@ -247,7 +261,7 @@ input[type=checkbox] {
 /* Multi dimensional menu */
 .menu {display: inline-block;}
 .menu .parent {display: block;position: relative;float: left;line-height: 24px;background-color: rgba(255,255,255,0.7);}
-.menu .parent a{margin: 10px;color: #000;text-decoration: none;}
+.menu .parent a{margin: 10px;color: #000;text-decoration: none;white-space: nowrap;}
 .menu .parent:hover > ul {display:block;position:absolute;z-index: 1}
 .menu .parent:active > ul {display:none;position:absolute;}
 .menu .child {display: none;}

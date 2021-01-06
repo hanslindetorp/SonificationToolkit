@@ -118,6 +118,26 @@ class DataManager {
     }
   }
 
+  new(){
+    let OK = true;
+    if(this._variables.length){
+      OK = confirm("Do you want to clear your current configuration?");
+    }
+    if(OK){
+
+      while(this._variables.length){
+        let varObj = this._variables.pop();
+        varObj.mute();
+        this.removeVariable(varObj.id)
+      }
+
+      this.GUI.clear();
+      return true;
+    } else {
+      return false;
+    }
+  }
+
   setAllData(json){
 
     let data;
@@ -128,23 +148,16 @@ class DataManager {
         return;
     }
 
-    let OK = true;
-    if(this._variables.length){
-      OK = confirm("Do you want to replace your current configuration?");
-    }
+    let OK = this.new();
     if(OK){
-      while(this._variables.length){
-        let varObj = this._variables.pop();
-        varObj.mute();
-        this.removeVariable(varObj.id)
-      }
+
       this.variableID = 0;
       this.duration = data.duration || 60;
       this.GUI.duration = this.duration;
 
       let id = 0;
       data.variableMappings.forEach(varData => {
-        let varObj = this.setVariable(varData.rowID, varData.name, varData.id, varData);
+        let varObj = this.setVariable(varData.id, varData.name, varData.rowID, varData);
         this.setTargetAudioObject(varData.id, varData.audioObjectID);
 
         varData.mappings.forEach(mapping => {
@@ -176,11 +189,11 @@ class DataManager {
   }
 
   get variableID(){
-    return this._variableID++;
+    return Variable.cnt;
   }
 
   set variableID(val){
-    this._variableID = val;
+    Variable.cnt = val;
   }
 
   setVariable(id, varName, rowID, varData){
@@ -196,12 +209,13 @@ class DataManager {
     } else {
       if(varData){
         varData.values = values;
+        this.GUI.useColor(varData.color);
       } else {
         varData = {
           values: values,
           id: id,
           rowID: rowID,
-          color: this.GUI.color
+          color: this.GUI.nextColor()
         }
       }
       varObj = new Variable(varName, varData, this._columnValues);
@@ -305,7 +319,10 @@ class DataManager {
   removeVariable(id){
     let targetIDs = [];
     this._variables.forEach((item, i) => {
-      if(item.id == id){targetIDs.push(i)}
+      if(item.id == id){
+        item.mute();
+        targetIDs.push(i)
+      }
     });
     targetIDs.reverse().forEach((item, i) => {
       this._variables.splice(item, 1);

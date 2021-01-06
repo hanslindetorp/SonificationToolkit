@@ -7,7 +7,11 @@ class AudioParameterMapping {
   }
 
   init(varObj, paramObj, data){
-    this.id = typeof data.id == "undefined" ? AudioParameterMapping.cnt++ : data.id;
+    if(typeof data.id != "undefined"){
+      // auto increase counter if initing from stored data
+      AudioParameterMapping.cnt = Math.max(AudioParameterMapping.cnt, parseInt(data.id));
+    }
+    this.id = AudioParameterMapping.cnt++;
     this.state = typeof data.state == "undefined" ? true : data.state;
     this.invert = typeof data.invert == "undefined" ? false : data.invert;
 

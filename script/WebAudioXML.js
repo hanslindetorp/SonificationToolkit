@@ -580,6 +580,11 @@ class AudioObject{
 	  	//transitionTime = transitionTime || 0.001;
 	  	//console.log(value, delay, transitionTime, cancelPrevious);
 
+      // checking that value is OK (i.e. not undefined)
+      if(!isFinite(value)){
+        console.log("non-finite");
+        return;
+      }
 
 
 

@@ -5,7 +5,6 @@ class GUI {
   constructor(selectors = {}){
 
     this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F"];
-    this._colorID = 0;
 
     window.onbeforeunload = () => {
       return 'Are you sure you want to leave?';
@@ -77,6 +76,12 @@ class GUI {
       });
     }
 
+    if(this._elements.newBtn){
+      this._elements.newBtn.addEventListener("click", e => {
+        this._dataManager.new();
+      });
+    }
+
     if(this._elements.openBtn){
       this._elements.openBtn.addEventListener("click", e => {
         this._elements.dataInputContainer.style.display = "block";
@@ -111,11 +116,16 @@ class GUI {
     this._dataManager = dm;
   }
 
-  initVariables(variables, options = {}){
-
+  clear(){
     while(this._elements.variableRowContainer.children.length > 1){
       this._elements.variableRowContainer.removeChild(this._elements.variableRowContainer.firstChild);
     }
+    this._visualDisplay.draw([]);
+  }
+
+  initVariables(variables, options = {}){
+
+    this.clear();
 
     variables.forEach(varObj => {
       let row = this.addVariableRow(varObj, options);
@@ -127,6 +137,7 @@ class GUI {
 
     varRow.style.backgroundColor = varObj.color;
     varRow.classList.add("isset");
+    this._elements.lastVariableRow.style.display = "block";
 
     let menu = varRow.querySelector(".variable .variableSelector");
     menu.querySelector("li > a").innerHTML =  varObj.name;
@@ -176,8 +187,6 @@ class GUI {
 
     }
 
-
-
     this.draw();
 
   }
@@ -190,6 +199,11 @@ class GUI {
     }
     state = state == false ? false : true;
     varRow.style.opacity = state ? 1 : 0.5;
+    if(state){
+      varRow.classList.remove("inactive");
+    } else {
+      varRow.classList.add("inactive");
+    }
     varRow.querySelector(".state").checked = state;
     this.draw();
   }
@@ -260,10 +274,12 @@ class GUI {
 
     let row = document.createElement("div");
 
+    // hide "add variable button temporarily"
+    this._elements.lastVariableRow.style.display = "none";
 
     // container for variable menu and all parameters
     row.classList.add("variableContainer");
-    row.dataset.id = this._dataManager.variableID;
+    row.dataset.id = varObj ? varObj.id : this._dataManager.variableID;
 
     this._elements.variableRowContainer.insertBefore(row, this._elements.lastVariableRow);
 
@@ -785,9 +801,20 @@ class GUI {
   }
 
   get color(){
-    return this._colors[this._colorID++ % this._colors.length];
+    return this._colors[0];
   }
 
+  nextColor(){
+    let col = this._colors.shift();
+    this._colors.push(col);
+    return col;
+  }
+
+  useColor(col){
+    let i = this._colors.indexOf(col);
+    this._colors.splice(i, 1);
+    this._colors.push(col);
+  }
 
 }
 

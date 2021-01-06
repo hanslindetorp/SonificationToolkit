@@ -15,6 +15,7 @@ var gui = new GUI({
   reverseBtn: "#reverseBtn",
   playBtn: "#playBtn",
   stopBtn: "#stopBtn",
+  newBtn: "#newBtn",
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
   loadBtn: "#data-input-container .loadBtn",
