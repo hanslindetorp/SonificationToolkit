@@ -1,4 +1,3 @@
-var FileManager = require('./FileManager.js');
 var DataManager = require('./DataManager.js');
 var GUI = require('./GUI.js');
 
@@ -6,7 +5,7 @@ var GUI = require('./GUI.js');
 
 var dataManager;
 var webAudioConfig;
-var fileManager = new FileManager();
+
 var gui = new GUI({
   variableRowContainer: "#variables",
   canvas: "#visual-output canvas",
@@ -18,6 +17,7 @@ var gui = new GUI({
   newBtn: "#newBtn",
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
+  shareBtn: "#shareBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
@@ -26,9 +26,12 @@ var gui = new GUI({
 
 
 webAudioXML.addEventListener("inited", e => {
-  let dm = new DataManager("data.csv", webAudioXML, gui);
-  dm.addEventListener("inited", e => {
+  let dataManager = new DataManager("data.csv", webAudioXML, gui);
+  dataManager.addEventListener("inited", e => {
     // init settings
-    fileManager.getFile("configuration.json", json => dm.setAllData(json));
+    let inited = dataManager.initFromURL();
+    if(!inited) {
+      dataManager.initFromFile("configuration.json");
+    }
   });
 });

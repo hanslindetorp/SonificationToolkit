@@ -32,11 +32,12 @@ class DataManager {
       this._data = this.parseData(src);
     }
 
+
     this.duration = this.GUI.duration;
   }
 
 
-  parseData(src){
+  parseData(src, callBack = ()=>{}){
 
     fetch(src)
       .then(response => response.text())
@@ -50,6 +51,7 @@ class DataManager {
           });
         });
         this._columnValues = this.firstRow.filter(entry => typeof entry == "number");
+        callBack();
         this.dispatchEvent(new CustomEvent("inited"));
       });
   }
@@ -116,6 +118,29 @@ class DataManager {
       default:
 
     }
+  }
+
+  getSharedLink(){
+    return window.location.host + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
+  }
+
+  initFromURL(){
+    let indexOfQuery = window.location.hash.indexOf("?")+1;
+    let queryString = window.location.hash.substr(indexOfQuery);
+    let urlParams = new URLSearchParams(window.location.search);
+    let dataStr = urlParams.get('data');
+    if(!dataStr){return false}
+
+    let decodedData = decodeURIComponent(dataStr);
+    let json = JSONUncrush(decodedData);
+    if(typeof json != "string"){return false}
+
+    this.setAllData(json);
+    return true;
+  }
+
+  initFromFile(file){
+    this.fileManager.getFile(file, json => this.setAllData(json));
   }
 
   new(){
@@ -200,7 +225,7 @@ class DataManager {
     let values = this.getVariableData(parseFloat(rowID));
     let varObj = this._variables.find(entry => entry.id == id);
     if(varObj){
-      varObj.update(varName, {values: values});
+      varObj.update(varName, {values: values, rowID: rowID});
 
       this.mappings.forEach(mapping => {
         mapping.update({variable: varObj});

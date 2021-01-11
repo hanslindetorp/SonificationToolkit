@@ -27,11 +27,13 @@ class Variable {
   update(name, data){
 
     // empty old values
-    while(this.values.length){
-      this.values.pop();
-    }
+    // while(this.values.length){
+    //   this.values.pop();
+    // }
+    this.values = [];
 
     this.name = name;
+    if(typeof data.rowID != "undefined"){this.rowID = data.rowID}
     delete(this.min);
     delete(this.max);
     delete(this.minCol);

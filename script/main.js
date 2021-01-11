@@ -3,7 +3,7 @@ class AudioParameterMapping {
 
   constructor(varObj, paramObj, data = {}){
     this.variable = varObj;
-    this.audioParameter = paramObj;
+    this._audioParameter = paramObj;
     this.init(varObj, paramObj, data);
   }
 
@@ -21,6 +21,14 @@ class AudioParameterMapping {
     this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
     this.outputHigh = typeof data.outputHigh == "undefined" ? paramObj.max : data.outputHigh;
 
+    this.inputRange = this.variable.max - this.variable.min;
+    this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
+    this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
+
+    this.outputRange = paramObj.max - paramObj.min;
+    this.relOutputLow = Math.pow((this.outputLow - paramObj.min) / this.outputRange, 1/paramObj.conv);
+    this.relOutputHigh= Math.pow((this.outputHigh - paramObj.min) / this.outputRange, 1/paramObj.conv);
+
 
   }
 
@@ -34,15 +42,28 @@ class AudioParameterMapping {
 
       switch (key) {
         case "variable":
-          // update mins and maxs
-          let range = this.variable.max - this.variable.min;
-          let relInputLow = (this.inputLow - this.variable.min) / range;
-          let relInputHigh= (this.inputHigh - this.variable.min) / range;
-          let newVarObj = value;
-          let newRange = newVarObj.max - newVarObj.min;
-          this.inputLow = relInputLow * newRange + newVarObj.min;
-          this.inputHigh = relInputHigh * newRange + newVarObj.max;
-          break;
+        // update mins and maxs
+        let newVarObj = value;
+        this.inputRange = newVarObj.max - newVarObj.min;
+        this.inputLow = this.relInputLow * this.inputRange + newVarObj.min;
+        this.inputHigh = this.relInputHigh * this.inputRange + newVarObj.min;
+        break;
+
+        case "inputLow":
+        this.relInputLow = (value - this.variable.min) / this.inputRange;
+        break;
+
+        case "inputHigh":
+        this.relInputHigh= (value - this.variable.min) / this.inputRange;
+        break;
+
+        case "outputLow":
+        this.relOutputLow = Math.pow((value - this.audioParameter.min) / this.outputRange, 1/this.audioParameter.conv);
+        break;
+
+        case "outputHigh":
+        this.relOutputHigh= Math.pow((value - this.audioParameter.min) / this.outputRange, 1/this.audioParameter.conv);
+        break;
 
         default:
 
@@ -70,6 +91,18 @@ class AudioParameterMapping {
     let output = relInput * (this.outputHigh - this.outputLow) + this.outputLow;
 
     return output;
+  }
+
+  set audioParameter(paramObj){
+    this._audioParameter = paramObj;
+
+    this.outputRange = paramObj.max - paramObj.min;
+    this.outputLow = Math.pow(this.relOutputLow, this.audioParameter.conv) * this.outputRange + paramObj.min;
+    this.outputHigh = Math.pow(this.relOutputHigh, this.audioParameter.conv) * this.outputRange + paramObj.min;
+
+  }
+  get audioParameter(){
+    return this._audioParameter;
   }
 
   get state(){
@@ -165,11 +198,12 @@ class DataManager {
       this._data = this.parseData(src);
     }
 
+
     this.duration = this.GUI.duration;
   }
 
 
-  parseData(src){
+  parseData(src, callBack = ()=>{}){
 
     fetch(src)
       .then(response => response.text())
@@ -183,6 +217,7 @@ class DataManager {
           });
         });
         this._columnValues = this.firstRow.filter(entry => typeof entry == "number");
+        callBack();
         this.dispatchEvent(new CustomEvent("inited"));
       });
   }
@@ -249,6 +284,29 @@ class DataManager {
       default:
 
     }
+  }
+
+  getSharedLink(){
+    return window.location.host + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
+  }
+
+  initFromURL(){
+    let indexOfQuery = window.location.hash.indexOf("?")+1;
+    let queryString = window.location.hash.substr(indexOfQuery);
+    let urlParams = new URLSearchParams(window.location.search);
+    let dataStr = urlParams.get('data');
+    if(!dataStr){return false}
+
+    let decodedData = decodeURIComponent(dataStr);
+    let json = JSONUncrush(decodedData);
+    if(typeof json != "string"){return false}
+
+    this.setAllData(json);
+    return true;
+  }
+
+  initFromFile(file){
+    this.fileManager.getFile(file, json => this.setAllData(json));
   }
 
   new(){
@@ -333,7 +391,7 @@ class DataManager {
     let values = this.getVariableData(parseFloat(rowID));
     let varObj = this._variables.find(entry => entry.id == id);
     if(varObj){
-      varObj.update(varName, {values: values});
+      varObj.update(varName, {values: values, rowID: rowID});
 
       this.mappings.forEach(mapping => {
         mapping.update({variable: varObj});
@@ -792,6 +850,13 @@ class GUI {
       });
     }
 
+    if(this._elements.shareBtn){
+      this._elements.shareBtn.addEventListener("click", e => {
+        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getSharedLink();
+        this._elements.dataOutputContainer.style.display = "block";
+      });
+    }
+
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
         el.addEventListener("click", e => {
@@ -835,8 +900,10 @@ class GUI {
     this.setVariableState(varRow, varObj.state);
 
     // audio object
-    this.selectAudioObject(varRow, varObj, options);
-
+    if(!varRow.classList.contains("hasAudioObject")){
+      this.selectAudioObject(varRow, varObj, options);
+    }
+    
     // update parameters
     let parameterRows = varRow.querySelectorAll(".parameter");
     if(parameterRows.length){
@@ -845,7 +912,7 @@ class GUI {
           el.parentNode.removeChild(el);
         });
 
-        let nextSibling = variableRow.querySelector(".output.multiSlider");
+        let nextSibling = parameterRow.querySelector(".output.multiSlider");
         let sliderData = {
           min: varObj.min,
           max: varObj.max,
@@ -1528,7 +1595,6 @@ GUI.curveTypes = [
 module.exports = GUI;
 
 },{"./VisualDisplay.js":7}],5:[function(require,module,exports){
-var FileManager = require('./FileManager.js');
 var DataManager = require('./DataManager.js');
 var GUI = require('./GUI.js');
 
@@ -1536,7 +1602,7 @@ var GUI = require('./GUI.js');
 
 var dataManager;
 var webAudioConfig;
-var fileManager = new FileManager();
+
 var gui = new GUI({
   variableRowContainer: "#variables",
   canvas: "#visual-output canvas",
@@ -1548,6 +1614,7 @@ var gui = new GUI({
   newBtn: "#newBtn",
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
+  shareBtn: "#shareBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
@@ -1556,14 +1623,17 @@ var gui = new GUI({
 
 
 webAudioXML.addEventListener("inited", e => {
-  let dm = new DataManager("data.csv", webAudioXML, gui);
-  dm.addEventListener("inited", e => {
+  let dataManager = new DataManager("data.csv", webAudioXML, gui);
+  dataManager.addEventListener("inited", e => {
     // init settings
-    fileManager.getFile("configuration.json", json => dm.setAllData(json));
+    let inited = dataManager.initFromURL();
+    if(!inited) {
+      dataManager.initFromFile("configuration.json");
+    }
   });
 });
 
-},{"./DataManager.js":2,"./FileManager.js":3,"./GUI.js":4}],6:[function(require,module,exports){
+},{"./DataManager.js":2,"./GUI.js":4}],6:[function(require,module,exports){
 
 class Variable {
   constructor(name, data, colVals){
@@ -1593,11 +1663,13 @@ class Variable {
   update(name, data){
 
     // empty old values
-    while(this.values.length){
-      this.values.pop();
-    }
+    // while(this.values.length){
+    //   this.values.pop();
+    // }
+    this.values = [];
 
     this.name = name;
+    if(typeof data.rowID != "undefined"){this.rowID = data.rowID}
     delete(this.min);
     delete(this.max);
     delete(this.minCol);

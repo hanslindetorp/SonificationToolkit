@@ -103,6 +103,13 @@ class GUI {
       });
     }
 
+    if(this._elements.shareBtn){
+      this._elements.shareBtn.addEventListener("click", e => {
+        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getSharedLink();
+        this._elements.dataOutputContainer.style.display = "block";
+      });
+    }
+
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
         el.addEventListener("click", e => {
@@ -146,8 +153,10 @@ class GUI {
     this.setVariableState(varRow, varObj.state);
 
     // audio object
-    this.selectAudioObject(varRow, varObj, options);
-
+    if(!varRow.classList.contains("hasAudioObject")){
+      this.selectAudioObject(varRow, varObj, options);
+    }
+    
     // update parameters
     let parameterRows = varRow.querySelectorAll(".parameter");
     if(parameterRows.length){
@@ -156,7 +165,7 @@ class GUI {
           el.parentNode.removeChild(el);
         });
 
-        let nextSibling = variableRow.querySelector(".output.multiSlider");
+        let nextSibling = parameterRow.querySelector(".output.multiSlider");
         let sliderData = {
           min: varObj.min,
           max: varObj.max,
