@@ -780,7 +780,7 @@ class GUI {
 
     this.addButton({
       target: row,
-      label: "add variable",
+      label: "Add Data Source",
       fn: e => this.addVariableRow(),
       class: ["addBtn"]
     });
@@ -903,7 +903,7 @@ class GUI {
     if(!varRow.classList.contains("hasAudioObject")){
       this.selectAudioObject(varRow, varObj, options);
     }
-    
+
     // update parameters
     let parameterRows = varRow.querySelectorAll(".parameter");
     if(parameterRows.length){
@@ -1045,7 +1045,7 @@ class GUI {
     let firstColumn = this._dataManager.firstColumn;
     firstColumn.shift();
 
-    let variableSelector = this.addMenu(variable, [{name: "Select Variable", children: firstColumn}], (e) => {
+    let variableSelector = this.addMenu(variable, [{name: "Select Data Source", children: firstColumn}], (e) => {
       let variableRow = e.target.closest(".variableContainer");
       let varObj = this._dataManager.setVariable(variableRow.dataset.id, e.target.dataset.value, e.target.dataset.index);
       this.selectVariable(variableRow, varObj);
@@ -1103,7 +1103,7 @@ class GUI {
 
     this.addButton({
       target: row,
-      label: "add parameter",
+      label: "Add Parameter",
       fn: e => {
         let varObj = this._dataManager.getVariable(row.dataset.id) || {};
         this.addParameterRow(parameters, varObj)
