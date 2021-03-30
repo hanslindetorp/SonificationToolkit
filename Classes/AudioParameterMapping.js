@@ -14,21 +14,30 @@ class AudioParameterMapping {
     this.id = AudioParameterMapping.cnt++;
     this.state = typeof data.state == "undefined" ? true : data.state;
     this.invert = typeof data.invert == "undefined" ? false : data.invert;
+    this.inputRange = this.variable.max - this.variable.min;
 
-    this.inputLow = typeof data.inputLow == "undefined" ? varObj.min : data.inputLow;
-    this.inputHigh = typeof data.inputHigh == "undefined" ? varObj.max : data.inputHigh;
+    if(typeof data.relInputLow != "undefined"){
+      // use relInputLow and relInputHigh to set inputLow and inputHigh
+      this.relInputLow = data.relInputLow;
+      this.relInputHigh= data.relInputHigh;
+
+      this.inputLow = this.variable.min + this.relInputLow * this.inputRange;
+      this.inputHigh = this.variable.min + this.relInputHigh * this.inputRange;
+    } else {
+      // use inputLow and inputHigh to set relInputLow and relInputHigh
+      this.inputLow = typeof data.inputLow == "undefined" ? varObj.min : data.inputLow;
+      this.inputHigh = typeof data.inputHigh == "undefined" ? varObj.max : data.inputHigh;
+
+      this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
+      this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
+    }
+
     this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
     this.outputHigh = typeof data.outputHigh == "undefined" ? paramObj.max : data.outputHigh;
-
-    this.inputRange = this.variable.max - this.variable.min;
-    this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
-    this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
 
     this.outputRange = paramObj.max - paramObj.min;
     this.relOutputLow = Math.pow((this.outputLow - paramObj.min) / this.outputRange, 1/paramObj.conv);
     this.relOutputHigh= Math.pow((this.outputHigh - paramObj.min) / this.outputRange, 1/paramObj.conv);
-
-
   }
 
   update(data){
@@ -53,7 +62,7 @@ class AudioParameterMapping {
         break;
 
         case "inputHigh":
-        this.relInputHigh= (value - this.variable.min) / this.inputRange;
+        this.relInputHigh = (value - this.variable.min) / this.inputRange;
         break;
 
         case "outputLow":
@@ -81,13 +90,13 @@ class AudioParameterMapping {
   mapValue(x){
     x = Math.max(this.inputLow, x);
     x = Math.min(this.inputHigh, x);
-    let relInput = (x - this.inputLow)/(this.inputHigh - this.inputLow);
+    let relInput = (x - this.inputLow)/ this.inputRange;
     // invert if specified
     relInput = this.invert ? 1 - relInput : relInput;
     // do math for exp, bellcurve, etc
     relInput = Math.pow(relInput, this.audioParameter.conv);
 
-    let output = relInput * (this.outputHigh - this.outputLow) + this.outputLow;
+    let output = relInput * this.outputRange + this.outputLow;
 
     return output;
   }
@@ -119,6 +128,8 @@ class AudioParameterMapping {
       inputHigh: this.inputHigh,
       outputLow: this.outputLow,
       outputHigh: this.outputHigh,
+      relInputLow: this.relInputLow,
+      relInputHigh: this.relInputHigh,
       invert: this.invert,
       state: this.state,
       id: this.id
