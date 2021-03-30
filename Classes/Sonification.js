@@ -18,6 +18,7 @@ var gui = new GUI({
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
   shareBtn: "#shareBtn",
+  statisticsBtn: "#statisticsBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
