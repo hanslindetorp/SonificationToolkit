@@ -27,6 +27,7 @@ class DataManager {
     this._variableID = 0;
 
     this.fileManager = new FileManager();
+    this.statistics = [];
 
     if(src){
       this._data = this.parseData(src);
@@ -50,7 +51,27 @@ class DataManager {
           	return floatVal;
           });
         });
+
+        // clean data from empty rows
+        let rowsToClear = [];
+        this._data.forEach((row, i) => {
+          if(row.length < 2){
+            rowsToClear.push(i);
+          }
+        });
+        while(rowsToClear.length){
+          this._data.splice(rowsToClear.pop(), 1);
+        }
+
+
         this._columnValues = this.firstRow.filter(entry => typeof entry == "number");
+        if(!this._columnValues.length){
+          // fill _columnValues with audio increased values
+          let val = 0;
+          while(this._columnValues.length < this.firstRow.length){
+            this._columnValues.push(val++);
+          }
+        }
         callBack();
         this.dispatchEvent(new CustomEvent("inited"));
       });
@@ -82,7 +103,7 @@ class DataManager {
   }
 
   getRow(x){
-    return this._data[x];
+    return x < this._data.length ? this._data[x] : [];
   }
 
   getColumn(x){
@@ -183,17 +204,63 @@ class DataManager {
       let id = 0;
       data.variableMappings.forEach(varData => {
         let varObj = this.setVariable(varData.id, varData.name, varData.rowID, varData);
+        if(!varObj){return}
+
         this.setTargetAudioObject(varData.id, varData.audioObjectID);
 
         varData.mappings.forEach(mapping => {
           let paramObj = this.getParameter(mapping.parameterID);
           let mappingObj = this.setMapping(mapping.id, varObj, paramObj, mapping);
           varObj.mappings.push(mappingObj);
+
+          this.statistics.push({
+            varName: varObj.name,
+            min: varObj.min,
+            max: varObj.max,
+            paramObj: paramObj.parent.path + paramObj.name,
+            inputLow: mapping.inputLow,
+            inputHigh: mapping.inputHigh,
+            outputLow: mapping.outputLow,
+            outputHigh: mapping.outputHigh,
+            convert: paramObj.conv,
+            invert: mapping.invert
+          });
         });
       });
       this.GUI.initVariables(this._variables, {warnings: false});
     }
 
+  }
+
+  outputStatistics(){
+    //if(!this.statistics.length){return ""}
+
+    // header
+    let str = `<h2>Mappings:</h2><table>`;
+
+    // colum names
+    let row = this.statistics[0];
+    str += `<tr>`;
+    Object.keys(row).forEach(key => {
+      str += `<td>${key}</td>`;
+    });
+    str += `</tr>`;
+
+    this.statistics.forEach((item, i) => {
+
+      str += "<tr>";
+      Object.keys(item).forEach(key => {
+        let val = item[key];
+        if(typeof val == "number"){
+          val = val.toString().replaceAll(".", ",");
+        }
+        str += `<td>${val}</td>`;
+      });
+      str += "</tr>";
+    });
+
+    str += "</table>";
+    return str;
   }
 
 
@@ -223,6 +290,8 @@ class DataManager {
 
   setVariable(id, varName, rowID, varData){
     let values = this.getVariableData(parseFloat(rowID));
+    if(!values.length){return}
+
     let varObj = this._variables.find(entry => entry.id == id);
     if(varObj){
       varObj.update(varName, {values: values, rowID: rowID});
@@ -267,7 +336,6 @@ class DataManager {
 
   getVariableData(id){
     return this.getRow(id+1).filter(val => typeof val == "number");
-    return this._data.find(row => row[0] == varName).filter(val => typeof val == "number");
   }
 
   get activeVariables(){
