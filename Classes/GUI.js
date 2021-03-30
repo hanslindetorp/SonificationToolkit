@@ -98,17 +98,26 @@ class GUI {
 
     if(this._elements.saveBtn){
       this._elements.saveBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getAllData();
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getAllData();
         this._elements.dataOutputContainer.style.display = "block";
       });
     }
 
     if(this._elements.shareBtn){
       this._elements.shareBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getSharedLink();
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getSharedLink();
         this._elements.dataOutputContainer.style.display = "block";
       });
     }
+
+    if(this._elements.statisticsBtn){
+      this._elements.statisticsBtn.addEventListener("click", e => {
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.outputStatistics();
+        this._elements.dataOutputContainer.style.display = "block";
+      });
+    }
+
+
 
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
