@@ -15,21 +15,30 @@ class AudioParameterMapping {
     this.id = AudioParameterMapping.cnt++;
     this.state = typeof data.state == "undefined" ? true : data.state;
     this.invert = typeof data.invert == "undefined" ? false : data.invert;
+    this.inputRange = this.variable.max - this.variable.min;
 
-    this.inputLow = typeof data.inputLow == "undefined" ? varObj.min : data.inputLow;
-    this.inputHigh = typeof data.inputHigh == "undefined" ? varObj.max : data.inputHigh;
+    if(typeof data.relInputLow != "undefined"){
+      // use relInputLow and relInputHigh to set inputLow and inputHigh
+      this.relInputLow = data.relInputLow;
+      this.relInputHigh= data.relInputHigh;
+
+      this.inputLow = this.variable.min + this.relInputLow * this.inputRange;
+      this.inputHigh = this.variable.min + this.relInputHigh * this.inputRange;
+    } else {
+      // use inputLow and inputHigh to set relInputLow and relInputHigh
+      this.inputLow = typeof data.inputLow == "undefined" ? varObj.min : data.inputLow;
+      this.inputHigh = typeof data.inputHigh == "undefined" ? varObj.max : data.inputHigh;
+
+      this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
+      this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
+    }
+
     this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
     this.outputHigh = typeof data.outputHigh == "undefined" ? paramObj.max : data.outputHigh;
-
-    this.inputRange = this.variable.max - this.variable.min;
-    this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
-    this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
 
     this.outputRange = paramObj.max - paramObj.min;
     this.relOutputLow = Math.pow((this.outputLow - paramObj.min) / this.outputRange, 1/paramObj.conv);
     this.relOutputHigh= Math.pow((this.outputHigh - paramObj.min) / this.outputRange, 1/paramObj.conv);
-
-
   }
 
   update(data){
@@ -54,7 +63,7 @@ class AudioParameterMapping {
         break;
 
         case "inputHigh":
-        this.relInputHigh= (value - this.variable.min) / this.inputRange;
+        this.relInputHigh = (value - this.variable.min) / this.inputRange;
         break;
 
         case "outputLow":
@@ -82,13 +91,13 @@ class AudioParameterMapping {
   mapValue(x){
     x = Math.max(this.inputLow, x);
     x = Math.min(this.inputHigh, x);
-    let relInput = (x - this.inputLow)/(this.inputHigh - this.inputLow);
+    let relInput = (x - this.inputLow)/ this.inputRange;
     // invert if specified
     relInput = this.invert ? 1 - relInput : relInput;
     // do math for exp, bellcurve, etc
     relInput = Math.pow(relInput, this.audioParameter.conv);
 
-    let output = relInput * (this.outputHigh - this.outputLow) + this.outputLow;
+    let output = relInput * this.outputRange + this.outputLow;
 
     return output;
   }
@@ -120,6 +129,8 @@ class AudioParameterMapping {
       inputHigh: this.inputHigh,
       outputLow: this.outputLow,
       outputHigh: this.outputHigh,
+      relInputLow: this.relInputLow,
+      relInputHigh: this.relInputHigh,
       invert: this.invert,
       state: this.state,
       id: this.id
@@ -193,6 +204,7 @@ class DataManager {
     this._variableID = 0;
 
     this.fileManager = new FileManager();
+    this.statistics = [];
 
     if(src){
       this._data = this.parseData(src);
@@ -216,7 +228,27 @@ class DataManager {
           	return floatVal;
           });
         });
+
+        // clean data from empty rows
+        let rowsToClear = [];
+        this._data.forEach((row, i) => {
+          if(row.length < 2){
+            rowsToClear.push(i);
+          }
+        });
+        while(rowsToClear.length){
+          this._data.splice(rowsToClear.pop(), 1);
+        }
+
+
         this._columnValues = this.firstRow.filter(entry => typeof entry == "number");
+        if(!this._columnValues.length){
+          // fill _columnValues with audio increased values
+          let val = 0;
+          while(this._columnValues.length < this.firstRow.length){
+            this._columnValues.push(val++);
+          }
+        }
         callBack();
         this.dispatchEvent(new CustomEvent("inited"));
       });
@@ -248,7 +280,7 @@ class DataManager {
   }
 
   getRow(x){
-    return this._data[x];
+    return x < this._data.length ? this._data[x] : [];
   }
 
   getColumn(x){
@@ -349,17 +381,63 @@ class DataManager {
       let id = 0;
       data.variableMappings.forEach(varData => {
         let varObj = this.setVariable(varData.id, varData.name, varData.rowID, varData);
+        if(!varObj){return}
+
         this.setTargetAudioObject(varData.id, varData.audioObjectID);
 
         varData.mappings.forEach(mapping => {
           let paramObj = this.getParameter(mapping.parameterID);
           let mappingObj = this.setMapping(mapping.id, varObj, paramObj, mapping);
           varObj.mappings.push(mappingObj);
+
+          this.statistics.push({
+            varName: varObj.name,
+            min: varObj.min,
+            max: varObj.max,
+            paramObj: paramObj.parent.path + paramObj.name,
+            inputLow: mapping.inputLow,
+            inputHigh: mapping.inputHigh,
+            outputLow: mapping.outputLow,
+            outputHigh: mapping.outputHigh,
+            convert: paramObj.conv,
+            invert: mapping.invert
+          });
         });
       });
       this.GUI.initVariables(this._variables, {warnings: false});
     }
 
+  }
+
+  outputStatistics(){
+    //if(!this.statistics.length){return ""}
+
+    // header
+    let str = `<h2>Mappings:</h2><table>`;
+
+    // colum names
+    let row = this.statistics[0];
+    str += `<tr>`;
+    Object.keys(row).forEach(key => {
+      str += `<td>${key}</td>`;
+    });
+    str += `</tr>`;
+
+    this.statistics.forEach((item, i) => {
+
+      str += "<tr>";
+      Object.keys(item).forEach(key => {
+        let val = item[key];
+        if(typeof val == "number"){
+          val = val.toString().replaceAll(".", ",");
+        }
+        str += `<td>${val}</td>`;
+      });
+      str += "</tr>";
+    });
+
+    str += "</table>";
+    return str;
   }
 
 
@@ -389,6 +467,8 @@ class DataManager {
 
   setVariable(id, varName, rowID, varData){
     let values = this.getVariableData(parseFloat(rowID));
+    if(!values.length){return}
+
     let varObj = this._variables.find(entry => entry.id == id);
     if(varObj){
       varObj.update(varName, {values: values, rowID: rowID});
@@ -433,7 +513,6 @@ class DataManager {
 
   getVariableData(id){
     return this.getRow(id+1).filter(val => typeof val == "number");
-    return this._data.find(row => row[0] == varName).filter(val => typeof val == "number");
   }
 
   get activeVariables(){
@@ -845,17 +924,26 @@ class GUI {
 
     if(this._elements.saveBtn){
       this._elements.saveBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getAllData();
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getAllData();
         this._elements.dataOutputContainer.style.display = "block";
       });
     }
 
     if(this._elements.shareBtn){
       this._elements.shareBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("textarea").value = this._dataManager.getSharedLink();
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getSharedLink();
         this._elements.dataOutputContainer.style.display = "block";
       });
     }
+
+    if(this._elements.statisticsBtn){
+      this._elements.statisticsBtn.addEventListener("click", e => {
+        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.outputStatistics();
+        this._elements.dataOutputContainer.style.display = "block";
+      });
+    }
+
+
 
     if(this._elements.closeBtn){
       this._elements.closeBtn.forEach(el => {
@@ -1615,6 +1703,7 @@ var gui = new GUI({
   openBtn: "#openBtn",
   saveBtn: "#saveBtn",
   shareBtn: "#shareBtn",
+  statisticsBtn: "#statisticsBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",
