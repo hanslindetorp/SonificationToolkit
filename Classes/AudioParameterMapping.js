@@ -96,7 +96,7 @@ class AudioParameterMapping {
     // do math for exp, bellcurve, etc
     relInput = Math.pow(relInput, this.audioParameter.conv);
 
-    let output = relInput * this.outputRange + this.outputLow;
+    let output = relInput * (this.outputHigh - this.outputLow) + this.outputLow;
 
     return output;
   }

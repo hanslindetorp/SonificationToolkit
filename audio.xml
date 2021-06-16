@@ -57,6 +57,12 @@
 		Q: the "q-factor" of the filter (https://en.wikipedia.org/wiki/Q_factor)
 		-->
 		<BiquadFilterNode class="Bandpass_Filter" type="bandpass" Q="70"></BiquadFilterNode>
+		
+		<!-- 
+		The PannerNode positions the sound in a 3D-space
+		(read more on https://developer.mozilla.org/en-US/docs/Web/API/PannerNode)
+		-->
+		<PannerNode panningModel="HRTF" rotationZ="-1" coneInnerAngle="0" coneOuterAngle="360" coneOuterGain="1" positionZ="1" positionX="2"></PannerNode>
 
 		<!--
 		The GainNode controls the volume of the audio signal. The attribute "gain" can
@@ -71,7 +77,6 @@
 		The "pan"-attribute can be set with a fixed value or controlled by the WeAudioXML
 		Sonification Toolkit
 		-->
-		<StereoPannerNode pan="1"></StereoPannerNode>
 	</Chain>
 
 

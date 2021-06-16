@@ -25,12 +25,14 @@ html, body {
   margin-top: 5px;
 }
 
-.data-container textarea {
+.data-container textarea, .data-container #outputText {
 	display: block;
 	overflow-y: auto;
 	width: 95%;
 	height: 95%;
 	margin: 30px auto;
+	background-color: white;
+	color: black;
 }
 
 #openBtn, #saveBtn {
