@@ -47,7 +47,7 @@ html, body {
 }
 
 #container > button {
-	width: 78px;
+	min-width: 78px;
 }
 h1 {
 	color: #D4E09B;

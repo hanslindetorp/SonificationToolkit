@@ -952,6 +952,14 @@ class GUI {
         });
       });
     }
+
+    if(this._elements.displayModeBtn){
+      this._elements.displayModeBtn.addEventListener("click", e => {
+          this.visualDisplay.switchMode();
+      });
+    }
+
+    
   }
 
   set dataManager(dm){
@@ -1704,6 +1712,7 @@ var gui = new GUI({
   saveBtn: "#saveBtn",
   shareBtn: "#shareBtn",
   statisticsBtn: "#statisticsBtn",
+  displayModeBtn: "#displayModeBtn",
   loadBtn: "#data-input-container .loadBtn",
   closeBtn: ".data-container .closeBtn",
   dataInputContainer: "#data-input-container",

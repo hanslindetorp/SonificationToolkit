@@ -126,6 +126,14 @@ class GUI {
         });
       });
     }
+
+    if(this._elements.displayModeBtn){
+      this._elements.displayModeBtn.addEventListener("click", e => {
+          this.visualDisplay.switchMode();
+      });
+    }
+
+    
   }
 
   set dataManager(dm){
