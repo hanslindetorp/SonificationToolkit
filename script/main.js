@@ -412,6 +412,8 @@ class DataManager {
   outputStatistics(){
     //if(!this.statistics.length){return ""}
 
+    if(!this.statistics.length){return ""}
+    
     // header
     let str = `<h2>Mappings:</h2><table>`;
 
