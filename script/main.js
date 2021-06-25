@@ -967,21 +967,37 @@ class GUI {
     if(this._elements.shareBtn){
       this._elements.shareBtn.addEventListener("click", e => {
 
-        let outputContainer = this._elements.dataOutputContainer;
-        let outputText = outputContainer.querySelector("#outputText");
-        outputText.value = this._dataManager.getSharedLink();
-        outputContainer.style.display = "block";
+          let url = this._dataManager.getSharedLink();
 
-        /* Select the text field */
-        outputText.select();
-        outputText.setSelectionRange(0, 99999); /* For mobile devices */
+          if (navigator.share) {
+            navigator.share({
+              title: 'WebAudioXML Sonification Toolkit',
+              url: url
+            }).then(() => {
+              console.log('Thanks for sharing!');
+            })
+            .catch(console.error);
+          } else {
+            // fallback
+            let outputContainer = this._elements.dataOutputContainer;
+            let outputText = outputContainer.querySelector("#outputText");
+            outputText.value = url;
+            outputContainer.style.display = "block";
 
-        /* Copy the text inside the text field */
-        document.execCommand("copy");
-        outputContainer.style.display = "none";
+            /* Select the text field */
+            outputText.select();
+            outputText.setSelectionRange(0, 99999); /* For mobile devices */
 
-        /* Alert the copied text */
-        alert("Configuration URL copied to clipboard");
+            /* Copy the text inside the text field */
+            document.execCommand("copy");
+            outputContainer.style.display = "none";
+
+            /* Alert the copied text */
+            alert("Configuration URL copied to clipboard");
+          }
+
+
+        
       });
     }
 
