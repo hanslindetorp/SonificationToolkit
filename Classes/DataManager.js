@@ -153,7 +153,7 @@ class DataManager {
   }
 
   getSharedLink(){
-    return window.location.host + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
+    return window.location.origin + window.location.pathname + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
   }
 
   initFromURL(){

@@ -338,7 +338,7 @@ class DataManager {
   }
 
   getSharedLink(){
-    return window.location.host + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
+    return window.location.origin + window.location.pathname + "?data=" + encodeURIComponent(JSONCrush(this.getAllData()));
   }
 
   initFromURL(){
@@ -956,9 +956,10 @@ class GUI {
 
         /* Copy the text inside the text field */
         document.execCommand("copy");
+        outputContainer.style.display = "none";
 
         /* Alert the copied text */
-        alert("Data copied to clipboard");
+        alert("Configuration data copied to clipboard");
 
       });
     }
@@ -977,9 +978,10 @@ class GUI {
 
         /* Copy the text inside the text field */
         document.execCommand("copy");
+        outputContainer.style.display = "none";
 
         /* Alert the copied text */
-        alert("Data copied to clipboard");
+        alert("Configuration URL copied to clipboard");
       });
     }
 
@@ -1562,8 +1564,10 @@ class GUI {
       let max = parseFloat(el.max);
       let range = max - min;
 
-      let valueLow = Math.max(min, parseFloat(minInput.value));
-      let valueHigh = Math.min(max, parseFloat(maxInput.value));
+      let valueLow = Math.min(parseFloat(minInput.value), parseFloat(maxInput.value));
+      let valueHigh = Math.max(parseFloat(minInput.value), parseFloat(maxInput.value));
+      valueLow = Math.max(min, valueLow);
+      valueHigh = Math.min(max, valueHigh);
       minInput.value = valueLow;
       maxInput.value = valueHigh;
 
@@ -1584,6 +1588,8 @@ class GUI {
 
       el.setAttribute("valueLow", values[0]);
       el.setAttribute("valueHigh", values[1]);
+      el.valueLow = values[0];
+      el.valueHigh = values[1];
     }
 
   }
