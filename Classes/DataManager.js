@@ -45,9 +45,20 @@ class DataManager {
       .then(csv => {
         this._data = csv.split("\n").map(row => {
           let delimiter = row.includes(";") ? ";" : ",";
+          let lastVal = 0;
           return row.split(delimiter).map(cell => {
+            
+            // fill with zeros until value is found
+            // fill with last value if gap in data
+            if(cell == ""){return lastVal}
+
             let floatVal = parseFloat(cell);
+
+            // return column or row names if not a number
             if(isNaN(floatVal)){return cell}
+
+            // update lastVal and return data number value if found
+            lastVal = floatVal;
           	return floatVal;
           });
         });
@@ -129,7 +140,7 @@ class DataManager {
         //data.audioConfig = {};
         //data.audioConfig.xml = this.audioConfig.xml;
         data.variableMappings = this.getMappingData();
-        return JSON.stringify(data);
+        return JSON.stringify(data, undefined, 4);
       break;
 
       case "xml":

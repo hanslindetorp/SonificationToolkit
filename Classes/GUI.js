@@ -4,7 +4,7 @@ class GUI {
 
   constructor(selectors = {}){
 
-    this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F"];
+    this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F", "#B75E38", "#819B25", "#AAAD9B", "#3FB4A6", "#7CECDD"];
 
     window.onbeforeunload = () => {
       return 'Are you sure you want to leave?';
@@ -98,15 +98,41 @@ class GUI {
 
     if(this._elements.saveBtn){
       this._elements.saveBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getAllData();
-        this._elements.dataOutputContainer.style.display = "block";
+        let outputContainer = this._elements.dataOutputContainer;
+        let outputText = outputContainer.querySelector("#outputText");
+        outputText.value = this._dataManager.getAllData();
+        outputContainer.style.display = "block";
+
+        /* Select the text field */
+        outputText.select();
+        outputText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        /* Copy the text inside the text field */
+        document.execCommand("copy");
+
+        /* Alert the copied text */
+        alert("Data copied to clipboard");
+
       });
     }
 
     if(this._elements.shareBtn){
       this._elements.shareBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getSharedLink();
-        this._elements.dataOutputContainer.style.display = "block";
+
+        let outputContainer = this._elements.dataOutputContainer;
+        let outputText = outputContainer.querySelector("#outputText");
+        outputText.value = this._dataManager.getSharedLink();
+        outputContainer.style.display = "block";
+
+        /* Select the text field */
+        outputText.select();
+        outputText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        /* Copy the text inside the text field */
+        document.execCommand("copy");
+
+        /* Alert the copied text */
+        alert("Data copied to clipboard");
       });
     }
 
@@ -177,7 +203,7 @@ class GUI {
     // update parameters
     let parameterRows = varRow.querySelectorAll(".parameter");
     if(parameterRows.length){
-      parameterRows.forEach(parameterRow => {
+      parameterRows.forEach((parameterRow, i) => {
         parameterRow.querySelectorAll(".input.multiSlider").forEach(el => {
           el.parentNode.removeChild(el);
         });
@@ -186,6 +212,8 @@ class GUI {
         let sliderData = {
           min: varObj.min,
           max: varObj.max,
+          valueLow: varObj.mappings[i].inputLow,
+          valueHigh: varObj.mappings[i].inputHigh,
           class: "input"
         }
 

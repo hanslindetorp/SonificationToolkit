@@ -19,8 +19,8 @@ class AudioParameterMapping {
 
     if(typeof data.relInputLow != "undefined"){
       // use relInputLow and relInputHigh to set inputLow and inputHigh
-      this.relInputLow = data.relInputLow;
-      this.relInputHigh= data.relInputHigh;
+      this.relInputLow = Math.max(0, data.relInputLow);
+      this.relInputHigh= Math.min(1, data.relInputHigh);
 
       this.inputLow = this.variable.min + this.relInputLow * this.inputRange;
       this.inputHigh = this.variable.min + this.relInputHigh * this.inputRange;
@@ -31,6 +31,8 @@ class AudioParameterMapping {
 
       this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
       this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
+      this.relInputLow = Math.max(0, this.relInputLow);
+      this.relInputHigh= Math.min(1, this.relInputHigh);
     }
 
     this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
@@ -56,18 +58,23 @@ class AudioParameterMapping {
         this.inputRange = newVarObj.max - newVarObj.min;
         this.inputLow = this.relInputLow * this.inputRange + newVarObj.min;
         this.inputHigh = this.relInputHigh * this.inputRange + newVarObj.min;
+        this.inputLow = Math.max(newVarObj.min, this.inputLow);
+        this.inputHigh = Math.min(newVarObj.max, this.inputHigh);
         break;
 
         case "inputLow":
         this.relInputLow = (value - this.variable.min) / this.inputRange;
+        this.relInputLow = Math.max(0, this.relInputLow);
         break;
 
         case "inputHigh":
         this.relInputHigh = (value - this.variable.min) / this.inputRange;
+        this.relInputHigh = Math.min(1, this.relInputHigh);
         break;
 
         case "outputLow":
         this.relOutputLow = Math.pow((value - this.audioParameter.min) / this.outputRange, 1/this.audioParameter.conv);
+
         break;
 
         case "outputHigh":
@@ -91,7 +98,8 @@ class AudioParameterMapping {
   mapValue(x){
     x = Math.max(this.inputLow, x);
     x = Math.min(this.inputHigh, x);
-    let relInput = (x - this.inputLow)/ this.inputRange;
+    let curRange = this.inputHigh - this.inputLow;
+    let relInput = (x - this.inputLow) / curRange;
     // invert if specified
     relInput = this.invert ? 1 - relInput : relInput;
     // do math for exp, bellcurve, etc
@@ -222,9 +230,20 @@ class DataManager {
       .then(csv => {
         this._data = csv.split("\n").map(row => {
           let delimiter = row.includes(";") ? ";" : ",";
+          let lastVal = 0;
           return row.split(delimiter).map(cell => {
+            
+            // fill with zeros until value is found
+            // fill with last value if gap in data
+            if(cell == ""){return lastVal}
+
             let floatVal = parseFloat(cell);
+
+            // return column or row names if not a number
             if(isNaN(floatVal)){return cell}
+
+            // update lastVal and return data number value if found
+            lastVal = floatVal;
           	return floatVal;
           });
         });
@@ -306,7 +325,7 @@ class DataManager {
         //data.audioConfig = {};
         //data.audioConfig.xml = this.audioConfig.xml;
         data.variableMappings = this.getMappingData();
-        return JSON.stringify(data);
+        return JSON.stringify(data, undefined, 4);
       break;
 
       case "xml":
@@ -832,7 +851,7 @@ class GUI {
 
   constructor(selectors = {}){
 
-    this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F"];
+    this._colors = ["#D4E09B", "#F6F4D2", "#F19C79", "#A44A3F", "#B75E38", "#819B25", "#AAAD9B", "#3FB4A6", "#7CECDD"];
 
     window.onbeforeunload = () => {
       return 'Are you sure you want to leave?';
@@ -926,15 +945,41 @@ class GUI {
 
     if(this._elements.saveBtn){
       this._elements.saveBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getAllData();
-        this._elements.dataOutputContainer.style.display = "block";
+        let outputContainer = this._elements.dataOutputContainer;
+        let outputText = outputContainer.querySelector("#outputText");
+        outputText.value = this._dataManager.getAllData();
+        outputContainer.style.display = "block";
+
+        /* Select the text field */
+        outputText.select();
+        outputText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        /* Copy the text inside the text field */
+        document.execCommand("copy");
+
+        /* Alert the copied text */
+        alert("Data copied to clipboard");
+
       });
     }
 
     if(this._elements.shareBtn){
       this._elements.shareBtn.addEventListener("click", e => {
-        this._elements.dataOutputContainer.querySelector("#outputText").innerHTML = this._dataManager.getSharedLink();
-        this._elements.dataOutputContainer.style.display = "block";
+
+        let outputContainer = this._elements.dataOutputContainer;
+        let outputText = outputContainer.querySelector("#outputText");
+        outputText.value = this._dataManager.getSharedLink();
+        outputContainer.style.display = "block";
+
+        /* Select the text field */
+        outputText.select();
+        outputText.setSelectionRange(0, 99999); /* For mobile devices */
+
+        /* Copy the text inside the text field */
+        document.execCommand("copy");
+
+        /* Alert the copied text */
+        alert("Data copied to clipboard");
       });
     }
 
@@ -1005,7 +1050,7 @@ class GUI {
     // update parameters
     let parameterRows = varRow.querySelectorAll(".parameter");
     if(parameterRows.length){
-      parameterRows.forEach(parameterRow => {
+      parameterRows.forEach((parameterRow, i) => {
         parameterRow.querySelectorAll(".input.multiSlider").forEach(el => {
           el.parentNode.removeChild(el);
         });
@@ -1014,6 +1059,8 @@ class GUI {
         let sliderData = {
           min: varObj.min,
           max: varObj.max,
+          valueLow: varObj.mappings[i].inputLow,
+          valueHigh: varObj.mappings[i].inputHigh,
           class: "input"
         }
 

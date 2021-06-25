@@ -18,8 +18,8 @@ class AudioParameterMapping {
 
     if(typeof data.relInputLow != "undefined"){
       // use relInputLow and relInputHigh to set inputLow and inputHigh
-      this.relInputLow = data.relInputLow;
-      this.relInputHigh= data.relInputHigh;
+      this.relInputLow = Math.max(0, data.relInputLow);
+      this.relInputHigh= Math.min(1, data.relInputHigh);
 
       this.inputLow = this.variable.min + this.relInputLow * this.inputRange;
       this.inputHigh = this.variable.min + this.relInputHigh * this.inputRange;
@@ -30,6 +30,8 @@ class AudioParameterMapping {
 
       this.relInputLow = (this.inputLow - this.variable.min) / this.inputRange;
       this.relInputHigh= (this.inputHigh - this.variable.min) / this.inputRange;
+      this.relInputLow = Math.max(0, this.relInputLow);
+      this.relInputHigh= Math.min(1, this.relInputHigh);
     }
 
     this.outputLow = typeof data.outputLow == "undefined" ? paramObj.min : data.outputLow;
@@ -55,18 +57,23 @@ class AudioParameterMapping {
         this.inputRange = newVarObj.max - newVarObj.min;
         this.inputLow = this.relInputLow * this.inputRange + newVarObj.min;
         this.inputHigh = this.relInputHigh * this.inputRange + newVarObj.min;
+        this.inputLow = Math.max(newVarObj.min, this.inputLow);
+        this.inputHigh = Math.min(newVarObj.max, this.inputHigh);
         break;
 
         case "inputLow":
         this.relInputLow = (value - this.variable.min) / this.inputRange;
+        this.relInputLow = Math.max(0, this.relInputLow);
         break;
 
         case "inputHigh":
         this.relInputHigh = (value - this.variable.min) / this.inputRange;
+        this.relInputHigh = Math.min(1, this.relInputHigh);
         break;
 
         case "outputLow":
         this.relOutputLow = Math.pow((value - this.audioParameter.min) / this.outputRange, 1/this.audioParameter.conv);
+
         break;
 
         case "outputHigh":
@@ -90,7 +97,8 @@ class AudioParameterMapping {
   mapValue(x){
     x = Math.max(this.inputLow, x);
     x = Math.min(this.inputHigh, x);
-    let relInput = (x - this.inputLow)/ this.inputRange;
+    let curRange = this.inputHigh - this.inputLow;
+    let relInput = (x - this.inputLow) / curRange;
     // invert if specified
     relInput = this.invert ? 1 - relInput : relInput;
     // do math for exp, bellcurve, etc

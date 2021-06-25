@@ -26,8 +26,8 @@
 		<script src="script/max.size.js"></script>
 		<script src="script/JSONCrush.min.js"></script>
 
-		<link rel="stylesheet" href="style.css" />
-		<link rel="stylesheet" href="multirange.css" />
+		<link rel="stylesheet" href="styles/style.css" />
+		<link rel="stylesheet" href="styles/multirange.css" />
 	</head>
 
 
@@ -56,10 +56,9 @@
 			<div id="instruction">
 				<p>The data comes from
 					<a href="https://www.gapminder.org/data/">https://www.gapminder.org/data/</a>
-					and shows the CO2-emissions per person from 1800 in different countries and
-					estimated to 2100.
+					and shows the CO2-emissions in metric tonnes per person and year from 1900 to 2018.
 				</p>
-				<h2>Parameter Mapping:</h2>
+				<h2>Quick Start:</h2>
 				<ol>
 					<li>Select a data source</li>
 					<li>Select and Audio Object</li>
@@ -70,8 +69,8 @@
 				</ol>
 				<h2>Configure data and sound model:</h2>
 				<ol>
-					<li>Replace the data with your own by updating data.csv-file (follow the provided data-structure)</li>
-					<li>Replace the audio configuration by editing the audio.xml-file (<a href="https://github.com/hanslindetorp/WebAudioXML">https://github.com/hanslindetorp/WebAudioXML</a>)</li>
+					<li>Replace the data with your own by updating the <a href="data.csv">data.csv</a>-file (follow the provided data-structure)</li>
+					<li>Replace the audio configuration by editing the <a href="audio.xml">audio.xml</a>-file (more info at <a href="https://github.com/hanslindetorp/WebAudioXML">https://github.com/hanslindetorp/WebAudioXML</a>)</li>
 			</div>
 
 			<div id="data-input-container" class="data-container">
@@ -81,7 +80,7 @@
 			</div>
 			<div id="data-output-container" class="data-container">
 				<button class="closeBtn">X</button>
-				<div id="outputText"></div>
+				<textarea id="outputText"></textarea>
 			</div>
 		</div>
 

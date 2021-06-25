@@ -1,1 +1,50 @@
-{"version":1,"duration":60,"variableMappings":[{"name":"United States","id":0,"rowID":"183","gain":0.04000000000000001,"state":true,"color":"#D4E09B","audioObjectID":2,"mappings":[{"parameterID":5,"inputLow":253,"inputHigh":6140000,"outputLow":18,"outputHigh":288,"invert":false,"state":true,"id":7},{"parameterID":8,"inputLow":253,"inputHigh":6140000,"outputLow":18,"outputHigh":13778,"invert":false,"state":true,"id":8}]},{"name":"Russia","id":1,"rowID":"141","gain":0.3364,"state":true,"color":"#F6F4D2","audioObjectID":14,"mappings":[{"parameterID":19,"inputLow":9.12,"inputHigh":2530000,"outputLow":128,"outputHigh":6962,"invert":false,"state":true,"id":2},{"parameterID":26,"inputLow":9.12,"inputHigh":2530000,"outputLow":-0.72,"outputHigh":0.66,"invert":true,"state":true,"id":5}]},{"name":"China","id":2,"rowID":"35","gain":0.25,"state":true,"color":"#F19C79","audioObjectID":59,"mappings":[{"parameterID":64,"inputLow":95.3,"inputHigh":10100000,"outputLow":0,"outputHigh":15.6,"invert":false,"state":true,"id":3},{"parameterID":82,"inputLow":95.3,"inputHigh":10100000,"outputLow":-0.72,"outputHigh":0.78,"invert":false,"state":true,"id":4}]}]}
+{
+    "version": 1,
+    "duration": 10,
+    "variableMappings": [
+        {
+            "name": "China",
+            "id": 3,
+            "rowID": "0",
+            "gain": 0.11560000000000002,
+            "state": true,
+            "color": "#A44A3F",
+            "audioObjectID": 2,
+            "mappings": [
+                {
+                    "parameterID": 5,
+                    "inputLow": 4.9,
+                    "inputHigh": 7.1,
+                    "outputLow": 500,
+                    "outputHigh": 2000,
+                    "relInputHigh": 1.0056657223796035,
+                    "invert": false,
+                    "state": true,
+                    "id": 12
+                }
+            ]
+        },
+        {
+            "name": "United States",
+            "id": 4,
+            "rowID": "6",
+            "gain": 1,
+            "state": true,
+            "color": "#D4E09B",
+            "audioObjectID": 14,
+            "mappings": [
+                {
+                    "parameterID": 19,
+                    "inputLow": 11.7,
+                    "inputHigh": 18.2,
+                    "outputLow": 1000,
+                    "outputHigh": 2000,
+                    "relInputHigh": 0.7097242380261248,
+                    "invert": false,
+                    "state": true,
+                    "id": 13
+                }
+            ]
+        }
+    ]
+}
