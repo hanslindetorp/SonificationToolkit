@@ -932,6 +932,7 @@ class GUI {
     if(this._elements.openBtn){
       this._elements.openBtn.addEventListener("click", e => {
         this._elements.dataInputContainer.style.display = "block";
+        this._elements.dataInputContainer.querySelector("textarea").value = "Paste your configuration data here..."
         //fileManager.open();
       });
     }

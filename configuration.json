@@ -3,46 +3,60 @@
     "duration": 10,
     "variableMappings": [
         {
-            "name": "China",
-            "id": 3,
-            "rowID": "0",
-            "gain": 0.11560000000000002,
+            "name": "United States",
+            "id": 5,
+            "rowID": "6",
+            "gain": 0.6084,
             "state": true,
-            "color": "#A44A3F",
+            "color": "#F6F4D2",
             "audioObjectID": 2,
             "mappings": [
                 {
                     "parameterID": 5,
-                    "inputLow": 4.9,
-                    "inputHigh": 7.1,
-                    "outputLow": 500,
-                    "outputHigh": 2000,
-                    "relInputHigh": 1.0056657223796035,
+                    "inputLow": 8.42,
+                    "inputHigh": 22.2,
+                    "outputLow": 20,
+                    "outputHigh": 100,
+                    "relInputLow": 0,
+                    "relInputHigh": 1,
                     "invert": false,
                     "state": true,
-                    "id": 12
+                    "id": 14
+                },
+                {
+                    "parameterID": 8,
+                    "inputLow": 8.42,
+                    "inputHigh": 22.2,
+                    "outputLow": 40,
+                    "outputHigh": 200,
+                    "relInputLow": 0,
+                    "relInputHigh": 1,
+                    "invert": false,
+                    "state": true,
+                    "id": 15
                 }
             ]
         },
         {
-            "name": "United States",
-            "id": 4,
-            "rowID": "6",
-            "gain": 1,
+            "name": "China",
+            "id": 6,
+            "rowID": "0",
+            "gain": 0.48999999999999994,
             "state": true,
-            "color": "#D4E09B",
-            "audioObjectID": 14,
+            "color": "#F19C79",
+            "audioObjectID": 54,
             "mappings": [
                 {
-                    "parameterID": 19,
-                    "inputLow": 11.7,
-                    "inputHigh": 18.2,
-                    "outputLow": 1000,
-                    "outputHigh": 2000,
-                    "relInputHigh": 0.7097242380261248,
+                    "parameterID": 57,
+                    "inputLow": 0,
+                    "inputHigh": 7.06,
+                    "outputLow": 0.1,
+                    "outputHigh": 2,
+                    "relInputLow": 0,
+                    "relInputHigh": 1,
                     "invert": false,
                     "state": true,
-                    "id": 13
+                    "id": 16
                 }
             ]
         }
