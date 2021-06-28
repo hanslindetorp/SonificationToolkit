@@ -34,6 +34,7 @@ webAudioXML.addEventListener("inited", e => {
     let inited = dataManager.initFromURL();
     if(!inited) {
       dataManager.initFromFile("configuration.json");
+      console.log("initFromFile()");
     }
   });
 });
