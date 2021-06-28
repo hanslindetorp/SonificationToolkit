@@ -178,6 +178,12 @@ class GUI {
       });
     }
 
+    document.body.addEventListener("click", e => {
+      document.querySelectorAll(".menu ul.open").forEach(el => {
+        el.classList.remove("open");
+      });
+    });
+   
     
   }
 
@@ -346,6 +352,7 @@ class GUI {
   addVariableRow(varObj, options){
 
     let row = document.createElement("div");
+
 
     // hide "add variable button temporarily"
     this._elements.lastVariableRow.style.display = "none";
@@ -835,9 +842,20 @@ class GUI {
           ul.classList.add("child");
           li.appendChild(ul);
 
+          a.addEventListener("click", e => {
+            ul.classList.add("open");
+            e.stopPropagation();
+          });
+          
+
         } else {
           a.href = "#";
-          a.addEventListener("pointerdown", fn);
+          a.addEventListener("click", fn);
+          a.addEventListener("click", e => {
+            document.querySelectorAll(".menu ul.open").forEach(el => {
+              el.classList.remove("open");
+            });
+          });
         }
 
 

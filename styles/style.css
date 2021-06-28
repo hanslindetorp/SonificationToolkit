@@ -266,8 +266,8 @@ input[type=checkbox] {
 .menu {display: inline-block;}
 .menu .parent {display: block;position: relative;float: left;line-height: 24px;background-color: rgba(255,255,255,0.7);}
 .menu .parent a{margin: 10px;color: #000;text-decoration: none;white-space: nowrap;}
-.menu .parent:hover > ul {display:block;position:absolute;z-index: 1}
-.menu .parent:active > ul {display:none;position:absolute;}
+/*.menu .parent:hovered > ul {display:block;position:absolute;z-index: 1}
+.menu .parent:active > ul {display:none;position:absolute;}*/
 .menu .child {display: none;}
 .menu .child li {background-color: #E4EFF7;line-height: 30px;border-bottom:#CCC 1px solid;border-right:#CCC 1px solid; width:100%;}
 .menu .child li a{color: #000000;}
@@ -278,3 +278,8 @@ ul.menu  ul ul{left: 100%;top: 0;margin-left:1px;}
 .menu .expand{font-size:12px;float:right;margin-right:5px;}
 .menu > li > a > span {display: none;}
 .menu > li {width: 150px;border-radius: 3px;border: 1px solid grey;border-right-style: solid;}
+
+
+/* NO HOVER */
+.menu ul.open {display:block;position:absolute;z-index: 1}
+.menu li:active {background-color: #95B4CA; z-index: 3}
