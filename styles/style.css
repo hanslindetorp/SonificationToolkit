@@ -18,7 +18,6 @@ html, body {
 }
 
 .data-container button {
-	float: right;
 	display: inline-block;
 	margin-right: 28px;
 	width: 70px;
