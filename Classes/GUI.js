@@ -293,6 +293,12 @@ class GUI {
     volumeSlider.value = Math.pow(vol, 1/2);
   }
 
+  setPan(id, pan){
+    let row = this.getVariableRow(id);
+    let panSlider = row.querySelector(".panSlider");
+    panSlider.value = pan;
+  }
+
   updateMapping(id, mappingObj){
     let row = this.getMappingRow(id);
 
@@ -414,6 +420,31 @@ class GUI {
     variable.appendChild(volumeSlider);
     //this.addMenu(variable, [{name: "Display group", children: this._dataManager.displayGroups}], (e) => this.selectVariable(e));
 
+
+    let panLabel = document.createElement("span");
+    panLabel.innerHTML = "Pan:";
+    panLabel.classList.add("panLabel");
+    variable.appendChild(panLabel);
+
+    let panSlider = document.createElement("input");
+    panSlider.setAttribute("type", "range");
+    panSlider.setAttribute("min", -5);
+    panSlider.setAttribute("max", 5);
+    panSlider.setAttribute("step", 1/10);
+    panSlider.setAttribute("value", varObj ? varObj.pan : 0);
+    panSlider.classList.add("panSlider");
+    panSlider.addEventListener("input", e => {
+      let varRow = e.target.closest(".variableContainer");
+      this._dataManager.setPan(varRow.dataset.id, e.target.value, false);
+    });
+    variable.appendChild(panSlider);
+    //this.addMenu(variable, [{name: "Display group", children: this._dataManager.displayGroups}], (e) => this.selectVariable(e));
+
+
+
+
+
+
     this.addButton({
       target: variable,
       label: "X",
@@ -451,7 +482,10 @@ class GUI {
     }
 
     //this._dataManager.audioConfig.tree.name = "Select Parameter";
-    let parameterMenu = this.addMenu(row, [varObj.targetAudioObject], (e) => {
+    let targetVariables = varObj.targetAudioObject.children.filter(child => child.type == "var");
+
+    // let parameterMenu = this.addMenu(row, [varObj.targetAudioObject], (e) => {
+    let parameterMenu = this.addMenu(row, [{children:targetVariables}], (e) => {
       let row = e.target.closest(".parameter");
       let paramObj = this._dataManager.getParameter(e.target.dataset.target);
 
@@ -582,7 +616,10 @@ class GUI {
     //   console.log(paramObj.parent);
     //   return;
     // }
-    menu.querySelector("li > a").innerHTML = `${paramObj.parent.name}.${paramObj.name}`;
+    // menu.querySelector("li > a").innerHTML = `${paramObj.parent.name}.${paramObj.name}`;
+    menu.querySelector("li > a").innerHTML = paramObj.label || paramObj.name;
+    
+    
     // `${parentMenuObject.innerHTML}.${e.target.innerHTML}`;
     //`${paramObj.parent._nodeType}.${paramObj.name}`;
 
@@ -812,7 +849,7 @@ class GUI {
       if(includeOption){
         curOptions.push(option);
         let a = document.createElement("a");
-        let name = option.name ? option.name : option;
+        let name = option.label || option.name || option;
         a.innerHTML = level ? name : (label ? label : name); // top level can have specified label
 
         let li = document.createElement("li");

@@ -1,62 +1,76 @@
 {
     "version": 1,
-    "duration": 10,
+    "duration": 20,
     "variableMappings": [
         {
-            "name": "United States",
-            "id": 5,
-            "rowID": "6",
-            "gain": 0.6084,
+            "name": "China",
+            "id": 0,
+            "rowID": "0",
+            "gain": 0.5625,
+            "pan": -5,
             "state": true,
-            "color": "#F6F4D2",
-            "audioObjectID": 2,
+            "color": "#D4E09B",
+            "audioObjectID": 65,
             "mappings": [
                 {
-                    "parameterID": 5,
-                    "inputLow": 8.42,
-                    "inputHigh": 22.2,
-                    "outputLow": 20,
-                    "outputHigh": 100,
+                    "parameterID": 67,
+                    "inputLow": 0,
+                    "inputHigh": 7.06,
+                    "outputLow": 0.1,
+                    "outputHigh": 11.6,
                     "relInputLow": 0,
                     "relInputHigh": 1,
                     "invert": false,
                     "state": true,
-                    "id": 14
+                    "id": 1
                 },
                 {
-                    "parameterID": 8,
-                    "inputLow": 8.42,
-                    "inputHigh": 22.2,
-                    "outputLow": 40,
-                    "outputHigh": 200,
+                    "parameterID": 68,
+                    "inputLow": 0,
+                    "inputHigh": 5.4,
+                    "outputLow": 2836,
+                    "outputHigh": 10000,
                     "relInputLow": 0,
-                    "relInputHigh": 1,
+                    "relInputHigh": 0.764872521246459,
                     "invert": false,
                     "state": true,
-                    "id": 15
+                    "id": 2
                 }
             ]
         },
         {
-            "name": "China",
-            "id": 6,
-            "rowID": "0",
-            "gain": 0.48999999999999994,
+            "name": "United States",
+            "id": 1,
+            "rowID": "6",
+            "gain": 0.10890000000000001,
+            "pan": 0.4,
             "state": true,
-            "color": "#F19C79",
-            "audioObjectID": 54,
+            "color": "#F6F4D2",
+            "audioObjectID": 47,
             "mappings": [
                 {
-                    "parameterID": 57,
-                    "inputLow": 0,
-                    "inputHigh": 7.06,
-                    "outputLow": 0.1,
-                    "outputHigh": 2,
+                    "parameterID": 49,
+                    "inputLow": 8.4,
+                    "inputHigh": 22.2,
+                    "outputLow": 1244,
+                    "outputHigh": 10000,
                     "relInputLow": 0,
                     "relInputHigh": 1,
                     "invert": false,
                     "state": true,
-                    "id": 16
+                    "id": 3
+                },
+                {
+                    "parameterID": 50,
+                    "inputLow": 8.4,
+                    "inputHigh": 22.2,
+                    "outputLow": 20,
+                    "outputHigh": 1000,
+                    "relInputLow": 0,
+                    "relInputHigh": 1,
+                    "invert": true,
+                    "state": true,
+                    "id": 4
                 }
             ]
         }

@@ -1,6 +1,6 @@
 
 class Variable {
-  constructor(name, data, colVals){
+  constructor(name, data, colVals, waxml){
 
     // make it possible to have data with gaps by allowing for each
     // value to have its own y value (time position)
@@ -19,7 +19,17 @@ class Variable {
     this.mappings = [];
     this.unit = data.unit;  // not used
     this._colVals = colVals;
+    this._ctx = waxml._ctx;
+
+    this.output = new GainNode(this._ctx);
+    this.panner = new PannerNode(this._ctx, {
+      panningModel: "HRTF",
+      positionZ: -1
+    });
+    this.output.connect(this.panner).connect(waxml.master._node);
+
     this.gain = typeof data.gain != "undefined" ? data.gain : 0.25;
+    this.pan = typeof data.pan != "undefined" ? data.pan : 0;
     this.values = [];
     this.update(name, data);
   }
@@ -83,15 +93,37 @@ class Variable {
   }
 
   unMute(){
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = this.gain;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(this.gain, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = this.gain;
     }
   }
 
   mute(){
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = 0;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(0, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = 0;
     }
+  }
+
+  disconnect(){
+    if(this._targetAudioObject){
+      this._targetAudioObject.target.disconnect(0);
+    }
+  }
+
+  set targetAudioObject(obj){
+    if(this._targetAudioObject){
+      this._targetAudioObject.target.disconnect(0);
+    }
+    let target = obj.target;
+    target.disconnect(0);
+    target.connect(this.output);
+    this._targetAudioObject = obj;
+  }
+
+  get targetAudioObject(){
+    return this._targetAudioObject;
   }
 
   get state(){
@@ -100,8 +132,9 @@ class Variable {
 
   set state(_state){
     this._state = _state;
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = _state ? this.gain : 0;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(_state ? this.gain : 0, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = _state ? this.gain : 0;
     }
   }
 
@@ -111,21 +144,34 @@ class Variable {
       id: this.id,
       rowID: this.rowID,
       gain: this.gain,
+      pan: this.pan,
       state: this.state,
       color: this.color,
-      audioObjectID: this.targetAudioObject ? this.targetAudioObject.id : 0
+      audioObjectID: this._targetAudioObject ? this._targetAudioObject.id : 0
     };
   }
 
   set gain(val){
     this._gain = val;
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = val;
+    this.output.gain.setValueAtTime(val, this._ctx.currentTime);
+    if(this._targetAudioObject){
+      
+      // this._targetAudioObject.target.gain = val;
     }
   }
 
   get gain(){
     return this._gain;
+  }
+
+  get pan(){
+    return this._pan;
+  }
+
+  set pan(val){
+    val = parseFloat(val);
+    this._pan = val;
+    this.panner.positionX.setValueAtTime(val, this._ctx.currentTime);
   }
 
 }

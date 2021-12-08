@@ -15,7 +15,10 @@ class DataManager {
 
     this.muteAllAudioObjects();
     this.audioConfig.audioObjects.forEach(audioObject => {
-      if(audioObject.level == 2){audioObject.target.gain = 0}
+      if(audioObject.level == 2){
+        audioObject.target.disconnect();
+        // audioObject.target.gain = 0;
+      }
     });
 
     this.mappings = [];
@@ -325,7 +328,7 @@ class DataManager {
           color: this.GUI.nextColor()
         }
       }
-      varObj = new Variable(varName, varData, this._columnValues);
+      varObj = new Variable(varName, varData, this._columnValues, this._waxml);
       this._variables.push(varObj);
     }
 
@@ -336,6 +339,12 @@ class DataManager {
     let varObj = this._variables.find(entry => entry.id == id);
     varObj.gain = vol;
     if(updateGUI){this.GUI.setGain(id, vol)}
+  }
+
+  setPan(id, pan, updateGUI = true){
+    let varObj = this._variables.find(entry => entry.id == id);
+    varObj.pan = pan;
+    if(updateGUI){this.GUI.setPan(id, pan)}
   }
 
   getVariable(id){
@@ -427,6 +436,7 @@ class DataManager {
     this._variables.forEach((item, i) => {
       if(item.id == id){
         item.mute();
+        item.disconnect();
         targetIDs.push(i)
       }
     });
@@ -474,7 +484,7 @@ class DataManager {
 
   muteAllAudioObjects(){
     this.audioConfig.audioObjects.forEach(audioObject => {
-      if(audioObject.level == 2){audioObject.target.gain = 0}
+      // if(audioObject.level == 2){audioObject.target.gain = 0}
     });
   }
 
@@ -576,7 +586,7 @@ class DataManager {
     this.mappings.filter(mapping => mapping.variable.state && mapping.state).forEach(mapping => {
       let val = mapping.variable.relX2val(this.pos);
       let output = mapping.mapValue(val);
-      mapping.audioParameter.parent.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
 
       //mapping.audioParameter.target.setTargetAtTime(output, 0, 0.01);
     });

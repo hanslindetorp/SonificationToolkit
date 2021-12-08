@@ -200,7 +200,10 @@ class DataManager {
 
     this.muteAllAudioObjects();
     this.audioConfig.audioObjects.forEach(audioObject => {
-      if(audioObject.level == 2){audioObject.target.gain = 0}
+      if(audioObject.level == 2){
+        audioObject.target.disconnect();
+        // audioObject.target.gain = 0;
+      }
     });
 
     this.mappings = [];
@@ -510,7 +513,7 @@ class DataManager {
           color: this.GUI.nextColor()
         }
       }
-      varObj = new Variable(varName, varData, this._columnValues);
+      varObj = new Variable(varName, varData, this._columnValues, this._waxml);
       this._variables.push(varObj);
     }
 
@@ -521,6 +524,12 @@ class DataManager {
     let varObj = this._variables.find(entry => entry.id == id);
     varObj.gain = vol;
     if(updateGUI){this.GUI.setGain(id, vol)}
+  }
+
+  setPan(id, pan, updateGUI = true){
+    let varObj = this._variables.find(entry => entry.id == id);
+    varObj.pan = pan;
+    if(updateGUI){this.GUI.setPan(id, pan)}
   }
 
   getVariable(id){
@@ -612,6 +621,7 @@ class DataManager {
     this._variables.forEach((item, i) => {
       if(item.id == id){
         item.mute();
+        item.disconnect();
         targetIDs.push(i)
       }
     });
@@ -659,7 +669,7 @@ class DataManager {
 
   muteAllAudioObjects(){
     this.audioConfig.audioObjects.forEach(audioObject => {
-      if(audioObject.level == 2){audioObject.target.gain = 0}
+      // if(audioObject.level == 2){audioObject.target.gain = 0}
     });
   }
 
@@ -761,7 +771,7 @@ class DataManager {
     this.mappings.filter(mapping => mapping.variable.state && mapping.state).forEach(mapping => {
       let val = mapping.variable.relX2val(this.pos);
       let output = mapping.mapValue(val);
-      mapping.audioParameter.parent.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
+      mapping.audioParameter.target.setTargetAtTime(mapping.audioParameter.name, output, 0, 0.001);
 
       //mapping.audioParameter.target.setTargetAtTime(output, 0, 0.01);
     });
@@ -1140,6 +1150,12 @@ class GUI {
     volumeSlider.value = Math.pow(vol, 1/2);
   }
 
+  setPan(id, pan){
+    let row = this.getVariableRow(id);
+    let panSlider = row.querySelector(".panSlider");
+    panSlider.value = pan;
+  }
+
   updateMapping(id, mappingObj){
     let row = this.getMappingRow(id);
 
@@ -1261,6 +1277,31 @@ class GUI {
     variable.appendChild(volumeSlider);
     //this.addMenu(variable, [{name: "Display group", children: this._dataManager.displayGroups}], (e) => this.selectVariable(e));
 
+
+    let panLabel = document.createElement("span");
+    panLabel.innerHTML = "Pan:";
+    panLabel.classList.add("panLabel");
+    variable.appendChild(panLabel);
+
+    let panSlider = document.createElement("input");
+    panSlider.setAttribute("type", "range");
+    panSlider.setAttribute("min", -5);
+    panSlider.setAttribute("max", 5);
+    panSlider.setAttribute("step", 1/10);
+    panSlider.setAttribute("value", varObj ? varObj.pan : 0);
+    panSlider.classList.add("panSlider");
+    panSlider.addEventListener("input", e => {
+      let varRow = e.target.closest(".variableContainer");
+      this._dataManager.setPan(varRow.dataset.id, e.target.value, false);
+    });
+    variable.appendChild(panSlider);
+    //this.addMenu(variable, [{name: "Display group", children: this._dataManager.displayGroups}], (e) => this.selectVariable(e));
+
+
+
+
+
+
     this.addButton({
       target: variable,
       label: "X",
@@ -1298,7 +1339,10 @@ class GUI {
     }
 
     //this._dataManager.audioConfig.tree.name = "Select Parameter";
-    let parameterMenu = this.addMenu(row, [varObj.targetAudioObject], (e) => {
+    let targetVariables = varObj.targetAudioObject.children.filter(child => child.type == "var");
+
+    // let parameterMenu = this.addMenu(row, [varObj.targetAudioObject], (e) => {
+    let parameterMenu = this.addMenu(row, [{children:targetVariables}], (e) => {
       let row = e.target.closest(".parameter");
       let paramObj = this._dataManager.getParameter(e.target.dataset.target);
 
@@ -1429,7 +1473,10 @@ class GUI {
     //   console.log(paramObj.parent);
     //   return;
     // }
-    menu.querySelector("li > a").innerHTML = `${paramObj.parent.name}.${paramObj.name}`;
+    // menu.querySelector("li > a").innerHTML = `${paramObj.parent.name}.${paramObj.name}`;
+    menu.querySelector("li > a").innerHTML = paramObj.label || paramObj.name;
+    
+    
     // `${parentMenuObject.innerHTML}.${e.target.innerHTML}`;
     //`${paramObj.parent._nodeType}.${paramObj.name}`;
 
@@ -1659,7 +1706,7 @@ class GUI {
       if(includeOption){
         curOptions.push(option);
         let a = document.createElement("a");
-        let name = option.name ? option.name : option;
+        let name = option.label || option.name || option;
         a.innerHTML = level ? name : (label ? label : name); // top level can have specified label
 
         let li = document.createElement("li");
@@ -1825,7 +1872,7 @@ webAudioXML.addEventListener("inited", e => {
 },{"./DataManager.js":2,"./GUI.js":4}],6:[function(require,module,exports){
 
 class Variable {
-  constructor(name, data, colVals){
+  constructor(name, data, colVals, waxml){
 
     // make it possible to have data with gaps by allowing for each
     // value to have its own y value (time position)
@@ -1844,7 +1891,17 @@ class Variable {
     this.mappings = [];
     this.unit = data.unit;  // not used
     this._colVals = colVals;
+    this._ctx = waxml._ctx;
+
+    this.output = new GainNode(this._ctx);
+    this.panner = new PannerNode(this._ctx, {
+      panningModel: "HRTF",
+      positionZ: -1
+    });
+    this.output.connect(this.panner).connect(waxml.master._node);
+
     this.gain = typeof data.gain != "undefined" ? data.gain : 0.25;
+    this.pan = typeof data.pan != "undefined" ? data.pan : 0;
     this.values = [];
     this.update(name, data);
   }
@@ -1908,15 +1965,37 @@ class Variable {
   }
 
   unMute(){
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = this.gain;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(this.gain, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = this.gain;
     }
   }
 
   mute(){
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = 0;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(0, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = 0;
     }
+  }
+
+  disconnect(){
+    if(this._targetAudioObject){
+      this._targetAudioObject.target.disconnect(0);
+    }
+  }
+
+  set targetAudioObject(obj){
+    if(this._targetAudioObject){
+      this._targetAudioObject.target.disconnect(0);
+    }
+    let target = obj.target;
+    target.disconnect(0);
+    target.connect(this.output);
+    this._targetAudioObject = obj;
+  }
+
+  get targetAudioObject(){
+    return this._targetAudioObject;
   }
 
   get state(){
@@ -1925,8 +2004,9 @@ class Variable {
 
   set state(_state){
     this._state = _state;
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = _state ? this.gain : 0;
+    if(this._targetAudioObject){
+      this.output.gain.setValueAtTime(_state ? this.gain : 0, this._ctx.currentTime);
+      // this._targetAudioObject.target.gain = _state ? this.gain : 0;
     }
   }
 
@@ -1936,21 +2016,34 @@ class Variable {
       id: this.id,
       rowID: this.rowID,
       gain: this.gain,
+      pan: this.pan,
       state: this.state,
       color: this.color,
-      audioObjectID: this.targetAudioObject ? this.targetAudioObject.id : 0
+      audioObjectID: this._targetAudioObject ? this._targetAudioObject.id : 0
     };
   }
 
   set gain(val){
     this._gain = val;
-    if(this.targetAudioObject){
-      this.targetAudioObject.target.gain = val;
+    this.output.gain.setValueAtTime(val, this._ctx.currentTime);
+    if(this._targetAudioObject){
+      
+      // this._targetAudioObject.target.gain = val;
     }
   }
 
   get gain(){
     return this._gain;
+  }
+
+  get pan(){
+    return this._pan;
+  }
+
+  set pan(val){
+    val = parseFloat(val);
+    this._pan = val;
+    this.panner.positionX.setValueAtTime(val, this._ctx.currentTime);
   }
 
 }
